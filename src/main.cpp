@@ -3,5 +3,4 @@
 
 int main() {
     Bot bot;
-    bot.SendMessage();
 }

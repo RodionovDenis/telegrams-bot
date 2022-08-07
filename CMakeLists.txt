@@ -5,4 +5,4 @@ include_directories(include)
 
 add_library(Bot src/bot.cpp)
 add_executable(PushUpBot src/main.cpp)
-target_link_libraries(PushUpBot Bot PocoNetSSL PocoNet PocoFoundation)
+target_link_libraries(PushUpBot Bot PocoNetSSL PocoNet PocoFoundation PocoJSON)

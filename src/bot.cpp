@@ -38,6 +38,7 @@ int64_t Bot::GetId(const std::string& name) {
         if (name == username) {
             auto id = user->getValue<int64_t>("id");
             admins_[id] = username;
+            stats_.try_emplace(id, 1u);
             return id;
         }
     }

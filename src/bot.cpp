@@ -4,7 +4,15 @@
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/JSON/Parser.h>
 
+#include "json_helper.h"
+#include "fmt/format.h"
+
 #include "bot.h"
+
+std::string GetReferenceMessage(const std::string& username, uint64_t id, const std::string& text) {
+    static std::string reference = "[{}](tg://user?id={})";
+    return fmt::format(reference, username, id);
+}
 
 int64_t Bot::GetId(const std::string& name) {
     for (const auto& value: admins_) {
@@ -38,7 +46,6 @@ int64_t Bot::GetId(const std::string& name) {
         if (name == username) {
             auto id = user->getValue<int64_t>("id");
             admins_[id] = username;
-            stats_.try_emplace(id, 1u);
             return id;
         }
     }
@@ -74,7 +81,7 @@ void Bot::SetAdmins() {
     }
 }
 
-std::vector<uint64_t> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
+std::vector<Post> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
     Poco::URI uri{api_ + "getUpdates"};
     uri.addQueryParameter("offset", std::to_string(offset));
     uri.addQueryParameter("timeout", std::to_string(timeout));
@@ -90,20 +97,26 @@ std::vector<uint64_t> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
     Poco::JSON::Parser parser;
     const auto reply = parser.parse(body);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
+    std::vector<Post> posts;
     for (const auto& it : *result) {
         const auto& post = it.extract<Poco::JSON::Object::Ptr>()->getObject("channel_post");
         if (post.isNull()) {
                 continue;
         }
-        auto author = post->getValue<std::string>("author_signature");
+        auto username = post->getValue<std::string>("author_signature");
+        posts.emplace_back(Post{
+            .id = GetId(username),
+            .username = username,
+            .time = post->getValue<std::uint64_t>("date")
+        });
     }
-    return {};
+    return posts;
 }
 
-void Bot::SendMessage() {
+void Bot::SendMessage(const std::string& text) {
     Poco::URI uri{api_ + "sendMessage"};
     uri.addQueryParameter("chat_id", chat_id_);
-    uri.addQueryParameter("text", "[Anastasiia](tg://user?id=1426821001), ты очень красивая девчуля!");
+    uri.addQueryParameter("text", text);
     uri.addQueryParameter("parse_mode", "Markdown");
     Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
     Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};

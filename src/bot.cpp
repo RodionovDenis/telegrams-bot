@@ -3,15 +3,41 @@
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/JSON/Parser.h>
+#include <fstream>
 
 #include "json_helper.h"
 #include "fmt/format.h"
+#include "nlohmann/json.hpp"
 
 #include "bot.h"
 
 std::string GetReferenceMessage(const std::string& username, uint64_t id, const std::string& text) {
-    static std::string reference = "[{}](tg://user?id={})";
+    static const std::string reference = "[{}](tg://user?id={})";
     return fmt::format(reference, username, id);
+}
+
+Bot::Bot() {
+    SetAdmins();
+    std::ifstream file_json{config_name_};
+    if (!file_json.is_open()) {
+        throw std::runtime_error("File " + config_name_ + " is not open!");
+    }
+    nlohmann::json j = nlohmann::json::parse(file_json);
+    j.get_to(config_);
+}
+
+void Bot::SaveConfig() {
+    nlohmann::json j = config_;
+    std::ofstream{config_name_} << j;
+}
+
+void Bot::Run() {
+    while (true) {
+        auto posts = GetUpdates(config_.offset, 5u);
+        for (const auto& post: posts) {
+
+        }
+    }
 }
 
 int64_t Bot::GetId(const std::string& name) {
@@ -21,7 +47,7 @@ int64_t Bot::GetId(const std::string& name) {
         }
     }
     Poco::URI uri{api_ + "getChatAdministrators"};
-    uri.addQueryParameter("chat_id", chat_id_);
+    uri.addQueryParameter("chat_id", std::to_string(chat_id_));
     Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
     Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
     session.sendRequest(request);
@@ -54,7 +80,7 @@ int64_t Bot::GetId(const std::string& name) {
 
 void Bot::SetAdmins() {
     Poco::URI uri{api_ + "getChatAdministrators"};
-    uri.addQueryParameter("chat_id", chat_id_);
+    uri.addQueryParameter("chat_id", std::to_string(chat_id_));
     Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
     Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
     session.sendRequest(request);
@@ -81,7 +107,7 @@ void Bot::SetAdmins() {
     }
 }
 
-std::vector<Post> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
+std::vector<Request> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
     Poco::URI uri{api_ + "getUpdates"};
     uri.addQueryParameter("offset", std::to_string(offset));
     uri.addQueryParameter("timeout", std::to_string(timeout));
@@ -97,14 +123,18 @@ std::vector<Post> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
     Poco::JSON::Parser parser;
     const auto reply = parser.parse(body);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
-    std::vector<Post> posts;
+    std::vector<Request> posts;
     for (const auto& it : *result) {
         const auto& post = it.extract<Poco::JSON::Object::Ptr>()->getObject("channel_post");
         if (post.isNull()) {
                 continue;
         }
+        const auto& chat = it.extract<Poco::JSON::Object::Ptr>()->getObject("chat");
+        if (chat->getValue<int64_t>("id") != chat_id_) {
+            continue;
+        }
         auto username = post->getValue<std::string>("author_signature");
-        posts.emplace_back(Post{
+        posts.emplace_back(VideoNote{
             .id = GetId(username),
             .username = username,
             .time = post->getValue<std::uint64_t>("date")
@@ -115,7 +145,7 @@ std::vector<Post> Bot::GetUpdates(uint64_t offset, uint16_t timeout) {
 
 void Bot::SendMessage(const std::string& text) {
     Poco::URI uri{api_ + "sendMessage"};
-    uri.addQueryParameter("chat_id", chat_id_);
+    uri.addQueryParameter("chat_id", std::to_string(chat_id_));
     uri.addQueryParameter("text", text);
     uri.addQueryParameter("parse_mode", "Markdown");
     Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};

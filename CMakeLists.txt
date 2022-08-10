@@ -5,7 +5,10 @@ add_subdirectory(lib/fmt)
 
 include_directories(include lib)
 
-add_library(Bot src/bot.cpp)
+add_library(Bot src/bot/bot.cpp)
+add_library(Api src/api/api.cpp)
+add_library(Time src/time/time.cpp)
 add_executable(PushUpBot src/main.cpp)
-target_link_libraries(Bot PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON fmt)
-target_link_libraries(PushUpBot Bot fmt)
+target_link_libraries(Api PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON)
+target_link_libraries(Bot fmt)
+target_link_libraries(PushUpBot Bot Api Time)

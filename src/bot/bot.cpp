@@ -1,5 +1,4 @@
 #include <fstream>
-#include <thread>
 
 #include "helpers/json_helper.h"
 #include "fmt/format.h"
@@ -8,30 +7,25 @@
 
 #include "bot/bot.h"
 
-
-//последнее - слелать проверку при обработки видео на тайм
-// если больше суток, начать с нуля.
+//добавить удаление после того как нас подняли а не после первого видоса (иначе мб лишнее напоминание)
 
 static std::string GetReferenceMessage(const std::string& username, uint64_t id) {
-    static const std::string reference = "[{}](tg://user?id={})";
+    static constexpr auto reference = "[{}](tg://user?id={})";
     return fmt::format(reference, username, id);
 }
 
-void Bot::ResetOnNewDay() {
-    for (auto it = config_.stats.begin(); it != config_.stats.end(); ++it) {
-        if (time_.DiffDays(time_.GetUnixTime(), it->second.last_activity) > 1) {
-            it = config_.stats.erase(it);
-        } else {
-            ++it;
-        }
-    }
+void Bot::ResetNewDay() {
+    std::erase_if(config_.stats, [this](const auto& pair){
+        return time_.DiffDays(time_.GetUnixTime(), pair.second.last_activity) > 1;
+    });
     SaveConfig();
 }
 
-
-std::optional<std::string> Bot::GetReminder() {
+std::optional<std::string> Bot::GetReminderMessage() {
+    // std::string message = fmt::format("До сгорания ударных режимов осталось {}.\n\n",
+    //                                     GetSlavicHours(24 - time_.GetCurrentTime().hours));
     std::string message = fmt::format("До сгорания ударных режимов осталось {}.\n\n",
-                                        GetSlavicHours(24 - time_.GetCurrentTime().hours));
+                                         GetSlavicHours(60 - (time_.GetCurrentTime().seconds)));
     bool is_empty = true;
     for (const auto& person : config_.stats) {
         if (!time_.IsSameDay(time_.GetUnixTime(), person.second.last_activity)) {
@@ -48,13 +42,60 @@ std::optional<std::string> Bot::GetReminder() {
     return message;
 }
 
-Bot::Bot() : admins_(api_.SetAdmins()) {
-     std::ifstream file_json{config_name_};
+void Bot::RemainderThreadLogic() {
+    // static auto sleep_for = [this]() -> uint64_t {
+    //     auto time = time_.GetCurrentTime();
+    //     auto diff = (60u - time.minutes) * 60u + (60u - time.seconds);
+    //     if ((time.hours >= 19 && time.hours <= 22)) {
+    //         return diff;
+    //     } else if (time.hours < 19) {
+    //         return (19 - time.hours) * 3600u + diff;
+    //     } else {
+    //         return 20u * 3600u +  diff;
+    //     }
+    // };
+    static auto sleep_for = [this]() -> uint64_t {
+        return 15u;
+    };
+    while (true) {
+        auto time = sleep_for();
+        std::this_thread::sleep_for(std::chrono::seconds(time));
+        std::lock_guard guard(mutex_);
+        api_.SendMessage(GetReminderMessage());
+    }
+}
+
+void Bot::NewDayThreadLogic() {
+    // static auto sleep_for = [this]() -> uint64_t {
+    //     auto time = time_.GetCurrentTime();
+    //     return (24 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
+    // };
+    static auto sleep_for = [this]() -> uint64_t {
+        return 60u;
+    };
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));
+        std::lock_guard guard(mutex_);
+        ResetNewDay();
+    }
+    
+}
+
+Bot::Bot() : admins_(api_.GetChatAdmins()) {
+     remainder_thread_ = std::thread(&Bot::RemainderThreadLogic, this);
+     new_day_thread_ = std::thread(&Bot::NewDayThreadLogic, this);
+     std::ifstream file_json;
+     file_json.open(config_name_);
      if (!file_json.is_open()) {
          throw std::runtime_error("File " + config_name_ + " is not open!");
      }
      nlohmann::json j = nlohmann::json::parse(file_json);
-     j.get_to(config_);
+     config_ = j;
+}
+
+Bot::~Bot() {
+    remainder_thread_.join();
+    new_day_thread_.join();
 }
 
 void Bot::SaveConfig() {
@@ -117,22 +158,22 @@ uint64_t Bot::GetId(const std::string& username) {
             return pair.first;
         }
     }
-    auto id = api_.GetId(username);
+    auto id = api_.GetAdminID(username);
     admins_[id] = username;
     return id;
 }
 
 void Bot::Run() {
     while (true) {
-        auto posts = api_.GetUpdates(&config_.offset, 5u);
-        for (const auto& post: posts) {
-            HandleResponse(post);
-        }
-        if (time_.IsEven()) {
-            api_.SendMessage(GetReminder());
-            std::this_thread::sleep_for(std::chrono::seconds(4));
-        } else if (time_.IsNewDay()) {
-            ResetOnNewDay();
-        }
+        try {
+            auto responses = api_.GetUpdates(config_.offset, 3600u);
+            std::lock_guard guard(mutex_);
+            config_.offset = responses.offset;
+            for (const auto& response: responses.data) {
+                HandleResponse(response);
+            }
+        } catch (std::exception& ex) {
+            std::cout << ex.what() << std::endl;
+        } 
     }
 }

@@ -9,8 +9,6 @@ struct Time {
 
 class CurrentTime {
 public:
-    bool IsEven();
-    bool IsNewDay();
     bool IsSameDay(uint64_t first_time, uint64_t second_time);
     uint16_t DiffDays(uint64_t first_time, uint64_t second_time);
     Time GetCurrentTime();

@@ -22,6 +22,9 @@ inline void to_json(nlohmann::json& j, FileConfig config) {
 
 inline void from_json(const nlohmann::json& j, FileConfig& config) {
     config.offset = j.at("offset");
+    if (auto it = j.find("stats"); it == j.end()) {
+        return;
+    }
     for (const auto& pair : j["stats"].items()) {
         config.stats[std::stoull(pair.key())] = pair.value();
     }

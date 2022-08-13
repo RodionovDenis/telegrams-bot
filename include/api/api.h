@@ -1,5 +1,7 @@
 #pragma once
 
+#include <Poco/URI.h>
+
 #include <string>
 #include <optional>
 #include <vector>
@@ -11,23 +13,26 @@ struct VideoNote {
     uint64_t time;
 };
 
-using Response = std::variant<std::string, VideoNote>;
-
-struct Answer {
-    uint64_t offset;
-    std::vector<Response> data;
+struct TextNote {
+    std::string text;
+    uint64_t time;
 };
 
+using ResponseNote = std::variant<TextNote, VideoNote>;
 
+struct Response {
+    uint64_t offset;
+    std::vector<ResponseNote> data;
+};
 
 class TelegramApi {
 public:
-    void SendMessage(const std::optional<std::string>& text);
-    Answer GetUpdates(uint64_t offset, uint16_t timeout);
-    std::unordered_map<int64_t, std::string> GetChatAdmins();
-    int64_t GetAdminID(const std::string& username);
+    void SendMessage(const std::optional<std::string>& text) const;
+    Response GetUpdates(uint64_t offset, uint16_t timeout) const;
+    std::unordered_map<int64_t, std::string> GetChatAdmins() const;
+    int64_t GetAdminID(const std::string& username) const;
 private:
-    const std::string api_ = "https://api.telegram.org/bot5096721296:AAFqVYX1EDPfnI8FAXeU57ESZWTtGjqcYRs/";
-    //const int64_t chat_id_ = -1001520252639;
-    const int64_t chat_id_ = -1001789330226;
+    static std::istream& GetBody(const Poco::URI& uri);
+    const std::string api_ = "https://api.telegram.org/bot5524400810:AAGhIs3__dsjSoFHzIHZ932Yorf2xBcK7Aw/";
+    const int64_t chat_id_ = -1001610052114;
 };

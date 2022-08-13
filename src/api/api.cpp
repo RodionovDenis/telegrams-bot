@@ -6,19 +6,10 @@
 
 #include <api/api.h>
 
-int64_t TelegramApi::GetAdminID(const std::string& name) {
+int64_t TelegramApi::GetAdminID(const std::string& name) const {
     Poco::URI uri{api_ + "getChatAdministrators"};
     uri.addQueryParameter("chat_id", std::to_string(chat_id_));
-    Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
-    session.setProxy("proxy.unn.ru", 8080);
-    Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
-    session.sendRequest(request);
-    Poco::Net::HTTPResponse response;
-    auto& body = session.receiveResponse(response);
-    const auto code = response.getStatus();
-    if (code != Poco::Net::HTTPResponse::HTTP_OK) {
-        throw std::runtime_error("getChatAdministrators is not ok");
-    }
+    auto& body = GetBody(uri);
     Poco::JSON::Parser parser;
     const auto reply = parser.parse(body);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
@@ -38,19 +29,10 @@ int64_t TelegramApi::GetAdminID(const std::string& name) {
     throw std::runtime_error("Nickname " + name + " is not found!");
 }
 
-std::unordered_map<int64_t, std::string> TelegramApi::GetChatAdmins() {
+std::unordered_map<int64_t, std::string> TelegramApi::GetChatAdmins() const {
     Poco::URI uri{api_ + "getChatAdministrators"};
     uri.addQueryParameter("chat_id", std::to_string(chat_id_));
-    Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
-    session.setProxy("proxy.unn.ru", 8080);
-    Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
-    session.sendRequest(request);
-    Poco::Net::HTTPResponse response;
-    auto& body = session.receiveResponse(response);
-    const auto code = response.getStatus();
-    if (code != Poco::Net::HTTPResponse::HTTP_OK) {
-        throw std::runtime_error("getChatAdministrators is not ok");
-    }
+    auto& body = GetBody(uri);
     Poco::JSON::Parser parser;
     const auto reply = parser.parse(body);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
@@ -70,24 +52,15 @@ std::unordered_map<int64_t, std::string> TelegramApi::GetChatAdmins() {
     return admins;
 }
 
-Answer TelegramApi::GetUpdates(uint64_t offset, uint16_t timeout) {
+Response TelegramApi::GetUpdates(uint64_t offset, uint16_t timeout) const {
     Poco::URI uri{api_ + "getUpdates"};
     uri.addQueryParameter("offset", std::to_string(offset));
     uri.addQueryParameter("timeout", std::to_string(timeout));
-    Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
-    session.setProxy("proxy.unn.ru", 8080);
-    Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
-    session.sendRequest(request);
-    Poco::Net::HTTPResponse response;
-    auto& body = session.receiveResponse(response);
-    const auto code = response.getStatus();
-    if (code != Poco::Net::HTTPResponse::HTTP_OK) {
-        throw std::runtime_error("getUpdates is not ok");
-    }
+    auto& body = GetBody(uri);
     Poco::JSON::Parser parser;
     const auto reply = parser.parse(body);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
-    Answer response_result;
+    Response response_result;
     for (const auto& it : *result) {
         const auto& post = it.extract<Poco::JSON::Object::Ptr>()->getObject("channel_post");
         if (post.isNull()) {
@@ -104,14 +77,17 @@ Answer TelegramApi::GetUpdates(uint64_t offset, uint16_t timeout) {
                 .time = post->getValue<std::uint64_t>("date")
             });
         } else if (post->has("text")) {
-            response_result.data.emplace_back(post->getValue<std::string>("text"));
+            response_result.data.emplace_back(TextNote{
+                .text = post->getValue<std::string>("text"),
+                .time = post->getValue<std::uint64_t>("date")
+            });
         }
         response_result.offset = it.extract<Poco::JSON::Object::Ptr>()->getValue<uint64_t>("update_id") + 1;
     }
     return response_result;
 }
 
-void TelegramApi::SendMessage(const std::optional<std::string>& text) {
+void TelegramApi::SendMessage(const std::optional<std::string>& text) const {
     if (!text) {
         return;
     }
@@ -119,14 +95,16 @@ void TelegramApi::SendMessage(const std::optional<std::string>& text) {
     uri.addQueryParameter("chat_id", std::to_string(chat_id_));
     uri.addQueryParameter("text", *text);
     uri.addQueryParameter("parse_mode", "Markdown");
+    auto& body = GetBody(uri);
+}
+
+std::istream& TelegramApi::GetBody(const Poco::URI& uri) {
     Poco::Net::HTTPSClientSession session{uri.getHost(), uri.getPort()};
-    session.setProxy("proxy.unn.ru", 8080);
     Poco::Net::HTTPRequest request{Poco::Net::HTTPRequest::HTTP_GET, uri.getPathAndQuery()};
     session.sendRequest(request);
     Poco::Net::HTTPResponse response;
-    auto& body = session.receiveResponse(response);
-    const auto code = response.getStatus();
-    if (code != Poco::Net::HTTPResponse::HTTP_OK) {
-        throw std::runtime_error("SendMessage is not ok");
+    if (response.getStatus() != Poco::Net::HTTPResponse::HTTP_OK) {
+        throw std::runtime_error("HTTP_BAD: " + uri.getPathAndQuery());
     }
+    return session.receiveResponse(response);
 }

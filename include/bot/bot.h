@@ -13,6 +13,7 @@
 struct InfoContext {
     uint64_t last_activity;
     uint16_t days;
+    std::string start_date;
 };
 
 struct FileConfig {
@@ -27,18 +28,17 @@ public:
     void Run();
 private:
     void SaveConfig();
-    void HandleResponse(const Response& response);
-    
-    void HandleText(const std::string& text);
-    void HandleVideoNote(const VideoNote& video);
+    void HandleResponseNote(const ResponseNote& response);
+    void HandleTextNote(const TextNote& note);
+    void HandleVideoNote(const VideoNote& note);
     std::optional<std::string> GetReminderMessage();
-    void ResetNewDay();
+    void ResetStats();
     uint64_t GetId(const std::string& username);
     void RemainderThreadLogic();
-    void NewDayThreadLogic();
+    void ResetThreadLogic();
 
     std::thread remainder_thread_;
-    std::thread new_day_thread_;
+    std::thread reset_thread_;
     std::mutex mutex_;
 
     TelegramApi api_;

@@ -7,27 +7,30 @@
 
 #include "bot/bot.h"
 
-//добавить удаление после того как нас подняли а не после первого видоса (иначе мб лишнее напоминание)
+//сортировать сгорание ударного режима
+// юзер, у вас сгорел режим...
 
 static std::string GetReferenceMessage(const std::string& username, uint64_t id) {
     static constexpr auto reference = "[{}](tg://user?id={})";
     return fmt::format(reference, username, id);
 }
 
-void Bot::ResetNewDay() {
-    std::erase_if(config_.stats, [this](const auto& pair){
+void Bot::ResetStats() {
+    std::erase_if(config_.stats, [this](const auto& pair) {
         return time_.DiffDays(time_.GetUnixTime(), pair.second.last_activity) > 1;
     });
     SaveConfig();
 }
 
 std::optional<std::string> Bot::GetReminderMessage() {
-    // std::string message = fmt::format("До сгорания ударных режимов осталось {}.\n\n",
-    //                                     GetSlavicHours(24 - time_.GetCurrentTime().hours));
     std::string message = fmt::format("До сгорания ударных режимов осталось {}.\n\n",
-                                         GetSlavicHours(60 - (time_.GetCurrentTime().seconds)));
+                                        GetSlavicHours(24 - time_.GetCurrentTime().hours));
     bool is_empty = true;
-    for (const auto& person : config_.stats) {
+    std::vector<std::pair<int64_t, InfoContext>> v = {config_.stats.begin(), config_.stats.end()};
+    std::sort(v.begin(), v.end(), [](const auto& l1, const auto& l2) {
+        return l1.second.days >= l2.second.days;
+    });
+    for (const auto& person: v) {
         if (!time_.IsSameDay(time_.GetUnixTime(), person.second.last_activity)) {
             auto username = admins_.at(person.first);
             message += fmt::format("{} — {}.\n", GetReferenceMessage(username, person.first),
@@ -43,19 +46,16 @@ std::optional<std::string> Bot::GetReminderMessage() {
 }
 
 void Bot::RemainderThreadLogic() {
-    // static auto sleep_for = [this]() -> uint64_t {
-    //     auto time = time_.GetCurrentTime();
-    //     auto diff = (60u - time.minutes) * 60u + (60u - time.seconds);
-    //     if ((time.hours >= 19 && time.hours <= 22)) {
-    //         return diff;
-    //     } else if (time.hours < 19) {
-    //         return (19 - time.hours) * 3600u + diff;
-    //     } else {
-    //         return 20u * 3600u +  diff;
-    //     }
-    // };
     static auto sleep_for = [this]() -> uint64_t {
-        return 15u;
+        auto time = time_.GetCurrentTime();
+        auto diff = (60u - time.minutes) * 60u + (60u - time.seconds);
+        if ((time.hours >= 19 && time.hours <= 22)) {
+            return diff;
+        } else if (time.hours < 19) {
+            return (19 - time.hours) * 3600u + diff;
+        } else {
+            return 20u * 3600u +  diff;
+        }
     };
     while (true) {
         auto time = sleep_for();
@@ -65,25 +65,22 @@ void Bot::RemainderThreadLogic() {
     }
 }
 
-void Bot::NewDayThreadLogic() {
-    // static auto sleep_for = [this]() -> uint64_t {
-    //     auto time = time_.GetCurrentTime();
-    //     return (24 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
-    // };
+void Bot::ResetThreadLogic() {
     static auto sleep_for = [this]() -> uint64_t {
-        return 60u;
+        auto time = time_.GetCurrentTime();
+        return (24 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
     };
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));
         std::lock_guard guard(mutex_);
-        ResetNewDay();
+        ResetStats();
     }
     
 }
 
 Bot::Bot() : admins_(api_.GetChatAdmins()) {
      remainder_thread_ = std::thread(&Bot::RemainderThreadLogic, this);
-     new_day_thread_ = std::thread(&Bot::NewDayThreadLogic, this);
+     reset_thread_ = std::thread(&Bot::ResetThreadLogic, this);
      std::ifstream file_json;
      file_json.open(config_name_);
      if (!file_json.is_open()) {
@@ -95,7 +92,7 @@ Bot::Bot() : admins_(api_.GetChatAdmins()) {
 
 Bot::~Bot() {
     remainder_thread_.join();
-    new_day_thread_.join();
+    reset_thread_.join();
 }
 
 void Bot::SaveConfig() {
@@ -103,52 +100,58 @@ void Bot::SaveConfig() {
     std::ofstream{config_name_} << j;
 }
 
-void Bot::HandleResponse(const Response& responce) {
-    if (const auto* p = std::get_if<std::string>(&responce)) {
-        HandleText(*p);
+void Bot::HandleResponseNote(const ResponseNote& responce) {
+    if (const auto* p = std::get_if<TextNote>(&responce)) {
+        HandleTextNote(*p);
     } else if (const auto* v = std::get_if<VideoNote>(&responce)) {
         HandleVideoNote(*v);
     }
     SaveConfig();
 }
 
-void Bot::HandleText(const std::string& text) {
-    if (text == "/help") {
+void Bot::HandleTextNote(const TextNote& note) {
+    if (time_.GetUnixTime() - note.time > 5) {
+        return;
+    }
+    if (note.text == "/help") {
         api_.SendMessage("Команды для запроса:\n\n"
                         "1. */help* — запрос поддерживаемых команд,\n"
                         "2. */stats_days* — статистика ударного режима всех участников.\n\n"
                         "Планы на будущее (в разработке):\n\n"
                         "1. */stats_push_up* — статистика суммарного количества отжиманий всех участников,\n"
                         "2. */stats_mean* — статистика среднего количества отжиманий в день всех участников.");
-    } else if (text == "/stats_days" && !config_.stats.empty()) {
-        std::vector<std::pair<int64_t, int64_t>> v;
-        for (const auto& stats: config_.stats) {
-            v.emplace_back(stats.first, stats.second.days);
-        }
+    } else if (note.text == "/stats_days" && !config_.stats.empty()) {
+        ResetStats();
+        std::vector<std::pair<int64_t, InfoContext>> v = {config_.stats.begin(), config_.stats.end()};
         std::sort(v.begin(), v.end(), [](const auto& l1, const auto& l2) {
-            return l1.second >= l2.second;
+            return l1.second.days >= l2.second.days;
         });
         std::string stats_message = "Статистика ударного режима всех участников:\n\n";
         for (auto i = 0u; i < v.size(); ++i) {
-            stats_message += fmt::format("{}. {} — {} ударного режима.\n", i + 1,
-                    GetReferenceMessage(admins_[v[i].first], v[i].first) , GetSlavicDays(v[i].second));
+            stats_message += fmt::format("{}. {} — {} ударного режима (с {}).\n", i + 1,
+                    GetReferenceMessage(admins_[v[i].first], v[i].first),
+                    GetSlavicDays(v[i].second.days),
+                    v[i].second.start_date);
         }
         api_.SendMessage(stats_message);
+    } else if (note.text == "/stats_days" && config_.stats.empty()) {
+        api_.SendMessage("У пользователей нет ударного режима.");
     }
 }
 
-void Bot::HandleVideoNote(const VideoNote& video) {
-    auto id = GetId(video.username);
+void Bot::HandleVideoNote(const VideoNote& note) {
+    auto id = GetId(note.username);
     if (auto it = config_.stats.find(id); it != config_.stats.end()) {
-        auto diff = time_.DiffDays(video.time, it->second.last_activity);
+        auto diff = time_.DiffDays(note.time, it->second.last_activity);
         if (diff == 1) {
             it->second.days++;
         } else if (diff > 1) {
             it->second.days = 1u;
+            it->second.start_date = GetDate();
         }
-        it->second.last_activity = video.time;
+        it->second.last_activity = note.time;
     } else {
-        config_.stats.emplace(id, InfoContext{.last_activity = video.time, .days = 1u});
+        config_.stats.emplace(id, InfoContext{.last_activity = note.time, .days = 1u, .start_date = GetDate()});
     }
 }
 
@@ -170,7 +173,7 @@ void Bot::Run() {
             std::lock_guard guard(mutex_);
             config_.offset = responses.offset;
             for (const auto& response: responses.data) {
-                HandleResponse(response);
+                HandleResponseNote(response);
             }
         } catch (std::exception& ex) {
             std::cout << ex.what() << std::endl;

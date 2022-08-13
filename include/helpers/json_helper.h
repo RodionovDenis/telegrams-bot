@@ -4,13 +4,15 @@
 #include "bot/bot.h"
 
 inline void to_json(nlohmann::json& j, InfoContext info) {
-    j = {{"last_activity", info.last_activity}, 
-         {"days", info.days}};
+    j = {{"last_activity", info.last_activity},
+         {"days", info.days},
+         {"start_date", info.start_date}};
 }
 
 inline void from_json(const nlohmann::json& j, InfoContext& info) {
     info.last_activity = j.at("last_activity");
     info.days = j.at("days");
+    info.start_date = j.at("start_date");
 }
 
 inline void to_json(nlohmann::json& j, FileConfig config) {

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Poco/Net/HTTPSClientSession.h>
 #include <Poco/URI.h>
 
 #include <string>
@@ -32,7 +33,7 @@ public:
     std::unordered_map<int64_t, std::string> GetChatAdmins() const;
     int64_t GetAdminID(const std::string& username) const;
 private:
-    static std::istream& GetBody(const Poco::URI& uri);
+    static Poco::Dynamic::Var GetReply(const Poco::URI& uri);
     const std::string api_ = "https://api.telegram.org/bot5524400810:AAGhIs3__dsjSoFHzIHZ932Yorf2xBcK7Aw/";
     const int64_t chat_id_ = -1001610052114;
 };

@@ -11,11 +11,9 @@ struct Time {
 
 class CurrentTime {
 public:
-    bool IsSameDay(uint64_t first_time, uint64_t second_time) const;
     uint16_t DiffDays(uint64_t first_time, uint64_t second_time) const;
     Time GetCurrentTime() const;
     uint64_t GetUnixTime() const;
-
 private:
     static constexpr auto kSecondsInDay = 86400u;
     static constexpr auto kUTC = 10800u;

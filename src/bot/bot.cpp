@@ -31,7 +31,7 @@ std::optional<std::string> Bot::GetReminderMessage() {
         return l1.second.days >= l2.second.days;
     });
     for (const auto& person: v) {
-        if (!time_.IsSameDay(time_.GetUnixTime(), person.second.last_activity)) {
+        if (time_.DiffDays(time_.GetUnixTime(), person.second.last_activity)) {
             auto username = admins_.at(person.first);
             message += fmt::format("{} — {}.\n", GetReferenceMessage(username, person.first),
                                         GetSlavicDays(person.second.days));
@@ -58,8 +58,8 @@ void Bot::RemainderThreadLogic() {
         }
     };
     while (true) {
-        auto time = sleep_for();
-        std::this_thread::sleep_for(std::chrono::seconds(time));
+        auto seconds = sleep_for();
+        std::this_thread::sleep_for(std::chrono::seconds(seconds));
         std::lock_guard guard(mutex_);
         api_.SendMessage(GetReminderMessage());
     }
@@ -71,7 +71,8 @@ void Bot::ResetThreadLogic() {
         return (23 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
     };
     while (true) {
-        std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));
+        auto seconds = sleep_for();
+        std::this_thread::sleep_for(std::chrono::seconds(seconds));
         std::lock_guard guard(mutex_);
         ResetStats();
     }
@@ -79,15 +80,15 @@ void Bot::ResetThreadLogic() {
 }
 
 Bot::Bot() : admins_(api_.GetChatAdmins()) {
-     remainder_thread_ = std::thread(&Bot::RemainderThreadLogic, this);
-     reset_thread_ = std::thread(&Bot::ResetThreadLogic, this);
-     std::ifstream file_json;
-     file_json.open(config_name_);
-     if (!file_json.is_open()) {
-         throw std::runtime_error("File " + config_name_ + " is not open!");
-     }
-     nlohmann::json j = nlohmann::json::parse(file_json);
-     config_ = j;
+    std::ifstream file_json;
+    file_json.open(config_name_);
+    if (!file_json.is_open()) {
+        throw std::runtime_error("File " + config_name_ + " is not open!");
+    }
+    nlohmann::json j = nlohmann::json::parse(file_json);
+    config_ = j;
+    remainder_thread_ = std::thread(&Bot::RemainderThreadLogic, this);
+    reset_thread_ = std::thread(&Bot::ResetThreadLogic, this);
 }
 
 Bot::~Bot() {

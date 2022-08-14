@@ -37,14 +37,14 @@ private:
     void RemainderThreadLogic();
     void ResetThreadLogic();
 
-    std::thread remainder_thread_;
-    std::thread reset_thread_;
-    std::mutex mutex_;
-
     TelegramApi api_;
     CurrentTime time_;
     
     std::unordered_map<int64_t, std::string> admins_;
     FileConfig config_;
     const std::string config_name_ = "config.json";
+
+    std::thread remainder_thread_;
+    std::thread reset_thread_;
+    std::mutex mutex_;
  };

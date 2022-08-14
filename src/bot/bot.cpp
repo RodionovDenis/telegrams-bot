@@ -49,12 +49,12 @@ void Bot::RemainderThreadLogic() {
     static auto sleep_for = [this]() -> uint64_t {
         auto time = time_.GetCurrentTime();
         auto diff = (60u - time.minutes) * 60u + (60u - time.seconds);
-        if ((time.hours >= 19 && time.hours <= 22)) {
+        if ((time.hours >= 18) && (time.hours <= 22)) {
             return diff;
-        } else if (time.hours < 19) {
-            return (19 - time.hours) * 3600u + diff;
+        } else if (time.hours < 18) {
+            return (18 - time.hours) * 3600u + diff;
         } else {
-            return 20u * 3600u +  diff;
+            return 19u * 3600u +  diff;
         }
     };
     while (true) {
@@ -68,7 +68,7 @@ void Bot::RemainderThreadLogic() {
 void Bot::ResetThreadLogic() {
     static auto sleep_for = [this]() -> uint64_t {
         auto time = time_.GetCurrentTime();
-        return (24 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
+        return (23 - time.hours) * 3600u + (60u - time.minutes) * 60u + (60u - time.seconds);
     };
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));

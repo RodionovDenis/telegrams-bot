@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 20)
 project(PushUpBot)
 add_subdirectory(lib/fmt)
 
+find_package(Poco REQUIRED Data Net)
+
 include_directories(include lib)
 
 add_library(Bot src/bot/bot.cpp)

@@ -42,7 +42,7 @@ private:
     
     std::unordered_map<int64_t, std::string> admins_;
     FileConfig config_;
-    const std::string config_name_ = "config.json";
+    const std::string config_name_ = "../config/config.json";
 
     std::thread remainder_thread_;
     std::thread reset_thread_;

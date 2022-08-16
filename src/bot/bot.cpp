@@ -48,7 +48,7 @@ std::optional<std::string> Bot::GetReminderMessage() {
 void Bot::RemainderThreadLogic() {
     static auto sleep_for = [this]() -> uint64_t {
         auto time = time_.GetCurrentTime();
-        auto diff = (60u - time.minutes) * 60u + (60u - time.seconds);
+        auto diff = (60u - time.minutes) * 60u + (60u - time.seconds) - 60u;
         if ((time.hours >= 18) && (time.hours <= 22)) {
             return diff;
         } else if (time.hours < 18) {

@@ -1,6 +1,6 @@
 # push-up-bot
 
-Необходимо создать папку `config` и положить туда файл `config.json`
+Необходимо создать папку `config` и положить туда файл `config.json` последнего обновления
 
 `docker build . --tag pushupbot`
 

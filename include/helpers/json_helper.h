@@ -1,7 +1,7 @@
 #pragma once
 
 #include "nlohmann/json.hpp"
-#include "bot/bot.h"
+#include "push-up-bot.h"
 
 inline void to_json(nlohmann::json& j, InfoContext info) {
     j = {{"last_activity", info.last_activity},

@@ -1,7 +1,7 @@
 #include <chrono>
-#include <time/time.h>
 #include <string>
 #include "fmt/format.h"
+#include "clock.h"
 
 std::string GetDate() {
      auto now = std::chrono::system_clock::now() + std::chrono::hours(3);

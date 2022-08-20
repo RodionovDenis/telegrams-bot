@@ -7,8 +7,8 @@
 #include <thread>
 #include <mutex>
 
-#include "api/api.h"
-#include "time/time.h"
+#include "api.h"
+#include "clock.h"
 
 struct InfoContext {
     uint64_t last_activity;
@@ -21,23 +21,24 @@ struct FileConfig {
     std::unordered_map<int64_t, InfoContext> stats;
 };
 
-class Bot {
+class PushUpBot {
 public:
-    explicit Bot();
-    ~Bot();
+    explicit PushUpBot();
+    ~PushUpBot();
     void Run();
 private:
     void SaveConfig();
-    void HandleResponseNote(const ResponseNote& response);
-    void HandleTextNote(const TextNote& note);
-    void HandleVideoNote(const VideoNote& note);
+    void HandleVideo(const RequestBot& request);
     std::optional<std::string> GetReminderMessage();
     void ResetStats();
-    uint64_t GetId(const std::string& username);
+    void ShowStats();
     void RemainderThreadLogic();
     void ResetThreadLogic();
 
-    TelegramApi api_;
+    const std::string endpoint_ = "https://api.telegram.org/bot5524400810:AAGhIs3__dsjSoFHzIHZ932Yorf2xBcK7Aw/";
+    const int64_t channel_id_ = -1001610052114;
+
+    std::unique_ptr<IApiTelegram> api_;
     CurrentTime time_;
     
     std::unordered_map<int64_t, std::string> admins_;

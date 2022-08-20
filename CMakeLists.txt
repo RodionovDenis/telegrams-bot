@@ -2,18 +2,20 @@ cmake_minimum_required(VERSION 3.16)
 
 set(CMAKE_CXX_STANDARD 20)
 
-project(PushUpBot)
+project(Bots)
 add_subdirectory(lib/fmt)
 
 find_package(Poco REQUIRED Data Net)
 
 include_directories(include lib)
 
-add_library(Bot src/bot/bot.cpp)
-add_library(Api src/api/api.cpp)
-add_library(Time src/time/time.cpp)
-add_executable(PushUpBot src/main.cpp)
+add_library(PushUpBot src/push-up-bot.cpp)
+add_library(Api src/api.cpp)
+add_library(Clock src/clock.cpp)
+
+add_executable(Bots src/main.cpp)
+
 target_link_libraries(Api PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON)
-target_link_libraries(Time fmt)
-target_link_libraries(Bot fmt pthread)
-target_link_libraries(PushUpBot Bot Api Time)
+target_link_libraries(Clock fmt)
+target_link_libraries(PushUpBot fmt pthread)
+target_link_libraries(Bots PushUpBot Api Clock)

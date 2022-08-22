@@ -80,7 +80,7 @@ std::pair<uint64_t, std::vector<RequestBot>> ApiTelegram::GetUpdates(uint64_t of
         if ((message.isNull() && post.isNull()) || 
             (!post.isNull() && post->getObject("chat")->getValue<int64_t>("id") != channel_id_) ) {
                 continue;
-        } else if (!post.isNull() && post->has("video_note")) {
+        } else if (!post.isNull() && (post->has("video_note") || post->has("video"))) {
             const auto& username = post->getValue<std::string>("author_signature");
             auto time = post->getValue<uint64_t>("date");
             requests.emplace_back(GetAdminID(username), username, time, SenderType::kChannel);   

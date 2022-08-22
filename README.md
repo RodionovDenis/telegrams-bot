@@ -1,4 +1,4 @@
-# push-up-bot
+# telegrams-bot
 
 Необходимо создать папку `config` и положить туда файл `config.json` последнего обновления
 

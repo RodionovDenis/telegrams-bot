@@ -7,6 +7,8 @@
 #include <unordered_map>
 #include <optional>
 
+#include "nlohmann/json.hpp"
+
 enum class SenderType {kChannel, kPerson};
 
 struct RequestBot {
@@ -23,7 +25,8 @@ struct RequestBot {
 
 class IApiTelegram {
 public:
-    virtual void SendMessage(int64_t chat_id, const std::string& text) = 0;
+    virtual void SendMessage(int64_t chat_id, const std::string& text, 
+                             const std::optional<nlohmann::json>& reply_markup = std::nullopt) = 0;
     virtual std::pair<uint64_t, std::vector<RequestBot>> GetUpdates(uint64_t offset, uint16_t timeout) = 0;
     virtual std::unordered_map<int64_t, std::string> GetChatAdmins() = 0;
     virtual int64_t GetAdminID(const std::string& name) = 0;

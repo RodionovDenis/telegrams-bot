@@ -1,9 +1,7 @@
 #include "push-up-bot.h"
-#include <chrono>
-#include <api.h>
-#include <fstream>
-#include "helpers/json_helper.h"
+#include "reader-bot.h"
 
 int main() {
-    PushUpBot().Run();
+    //PushUpBot().Run();
+    ReaderBot().Run();
 }

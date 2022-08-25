@@ -9,7 +9,8 @@
 class ApiTelegram : public IApiTelegram {
 public:
     ApiTelegram(const std::string& endpoint, int64_t channel_id);
-    void SendMessage(int64_t chat_id, const std::string& text) override;
+    void SendMessage(int64_t chat_id, const std::string& text, 
+                     const std::optional<nlohmann::json>& reply_markup) override;
     std::pair<uint64_t, std::vector<RequestBot>> GetUpdates(uint64_t offset, uint16_t timeout) override;
     int64_t GetAdminID(const std::string& name) override;
     std::unordered_map<int64_t, std::string> GetChatAdmins() override;
@@ -37,11 +38,15 @@ Poco::Dynamic::Var ApiTelegram::GetReply(const Poco::URI& uri) {
     return parser.parse(body);
 }
 
-void ApiTelegram::SendMessage(int64_t chat_id, const std::string& text) {
+void ApiTelegram::SendMessage(int64_t chat_id, const std::string& text, 
+                              const std::optional<nlohmann::json>& reply_markup) {
     Poco::URI uri{endpoint_ + "sendMessage"};
     uri.addQueryParameter("chat_id", std::to_string(chat_id));
     uri.addQueryParameter("text", text);
     uri.addQueryParameter("parse_mode", "Markdown");
+    if (reply_markup) {
+        uri.addQueryParameter("reply_markup", reply_markup->dump());
+    }
     const auto reply = GetReply(uri);
 }
 

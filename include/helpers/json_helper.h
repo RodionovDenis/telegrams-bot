@@ -44,15 +44,13 @@ inline void from_json(const nlohmann::json& j, Book& b) {
 }
 
 inline void to_json(nlohmann::json& j, User u) {
-    j = {{"username", std::move(u.username)}, 
-         {"rounds", u.rounds}, 
+    j = {{"rounds", u.rounds}, 
          {"last_activity", u.last_activity}, 
          {"start_date", u.start_date}, 
          {"current_books", u.current_books}};
 }
 
 inline void from_json(const nlohmann::json& j, User& u) {
-    u.username = j.at("username");
     u.rounds = j.at("rounds");
     u.last_activity = j.at("last_activity");
     u.start_date = j.at("start_date");
@@ -61,7 +59,7 @@ inline void from_json(const nlohmann::json& j, User& u) {
 
 inline void to_json(nlohmann::json& j, FileConfigReader config) {
     j = {{"offset", config.offset}};
-    for (const auto& pair: config.stats) {
+    for (const auto& pair: config.users) {
         j["stats"][std::to_string(pair.first)] = std::move(pair.second);
     }
 }
@@ -72,7 +70,7 @@ inline void from_json(const nlohmann::json& j, FileConfigReader& config) {
         return;
     }
     for (const auto& pair : j["stats"].items()) {
-        config.stats[std::stoull(pair.key())] = pair.value();
+        config.users[std::stoull(pair.key())] = pair.value();
     }
 }
 

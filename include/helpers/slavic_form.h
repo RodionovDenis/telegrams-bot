@@ -24,3 +24,8 @@ std::string GetSlavicHours(int n) {
     static constexpr std::array hours = {"часов", "час", "часа"};
     return fmt::format("{} {}", n,  hours[GetSlavicForm(n)]);
 }
+
+std::string GetSlavicPages(int n) {
+    static constexpr std::array pages = {"страниц", "страницу", "страницы"};
+    return fmt::format("{} {}", n, pages[GetSlavicForm(n)]);
+}

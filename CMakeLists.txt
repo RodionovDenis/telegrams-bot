@@ -10,7 +10,7 @@ find_package(Poco REQUIRED Data Net)
 include_directories(include lib)
 
 add_library(PushUpBot src/push-up-bot.cpp)
-add_library(ReaderBot src/reader-bot.cpp)
+add_library(ReaderBot src/reader-bot/reader-bot.cpp)
 add_library(Api src/api.cpp)
 add_library(Clock src/clock.cpp)
 

@@ -56,6 +56,7 @@ private:
     Book GetPatricipantBook(int64_t id, std::unique_lock<std::mutex>* lock); 
     RequestBot WaitRightRequest(int64_t id, std::unique_lock<std::mutex>* lock);
     void SaveConfig();
+    std::string GetReadMe() const;
 
     FileConfigReader config_;
     std::unordered_map<int64_t, std::string> participants_;
@@ -75,4 +76,5 @@ private:
     std::mutex mutex_;
 
     const std::string config_name_ = "reader.json";
+    const std::string read_me_path_ = "../src/reader-bot/read_me.txt";
 };

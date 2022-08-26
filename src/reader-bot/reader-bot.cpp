@@ -37,6 +37,16 @@ void ReaderBot::SaveConfig() {
     std::ofstream{config_name_} << j;
 }
 
+std::string ReaderBot::GetReadMe() const {
+    std::ifstream file(read_me_path_);
+    if (!file.is_open()) {
+        throw std::runtime_error("Read me file is not open");
+    }
+    std::ostringstream stream;
+    stream << file.rdbuf();
+    return stream.str();
+}
+
 void ReaderBot::Run() {
     while (true) {
         try {
@@ -55,6 +65,10 @@ void ReaderBot::Run() {
 }
 
 void ReaderBot::HandleParticipant(const RequestBot& request) {
+    if (request.text == "/start") {
+        auto str = GetReadMe();
+        api_->SendMessage(request.id, str);
+    }
     std::lock_guard guard(mutex_);
     auto it = currents_id_.find(request.id);
     if (request.text == "/add_session" && it == currents_id_.end()) {

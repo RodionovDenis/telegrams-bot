@@ -9,13 +9,18 @@ struct Time {
     uint16_t seconds;
 };
 
+enum class Day {kMonday, kTuesday, kWednesday, kThursday, kFriday, kSaturday, kSunday};
+
 class CurrentTime {
 public:
     uint16_t DiffDays(uint64_t first_time, uint64_t second_time) const;
+    uint16_t DiffIntervals(uint64_t first_time, uint64_t second_time) const;
     Time GetCurrentTime() const;
     uint64_t GetUnixTime() const;
+    Day GetWeekDay() const;
 
 private:
     static constexpr auto kSecondsInDay = 86400u;
+    static constexpr auto kSecondsInWeek = 604800u;
     static constexpr auto kUTC = 10800u;
 };

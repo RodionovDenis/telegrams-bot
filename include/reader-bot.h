@@ -9,6 +9,7 @@
 #include <condition_variable>
 #include <mutex>
 #include "api.h"
+#include "clock.h"
 
 struct Book {
     std::string author;
@@ -26,11 +27,16 @@ public:
     }
 };
 
-struct User {
+struct Statistic {
     uint16_t rounds = 0;
     uint64_t last_activity = 0;
-    std::string start_date; 
-    std::unordered_set<Book, HashBook> current_books;
+    uint32_t pages = 0;
+};
+
+struct User {
+    std::string username;
+    std::optional<Statistic> stat;
+    std::unordered_set<Book, HashBook> books;
 };
 
 struct FileConfigReader {
@@ -43,6 +49,7 @@ public:
     ReaderBot();
     void Run();
     void HandleParticipant(const RequestBot& request);
+    void RegistrationParticipant(int64_t id);
     void AddBook(int64_t id);
     void AddSession(const RequestBot& user_data);
     void DeleteBook(int64_t id);
@@ -52,6 +59,7 @@ private:
     nlohmann::json GetButtonsBooks(int64_t id) const;
     nlohmann::json RemoveButtons() const;
     
+    std::string GetUsername(int64_t id, std::unique_lock<std::mutex>* lock);
     std::pair<int, int> GetParticipantPages(int64_t id, std::unique_lock<std::mutex>* lock);
     Book GetPatricipantBook(int64_t id, std::unique_lock<std::mutex>* lock); 
     RequestBot WaitRightRequest(int64_t id, std::unique_lock<std::mutex>* lock);
@@ -64,7 +72,8 @@ private:
 
     static constexpr auto kRoundDays = 3u;
     static constexpr auto kPagesLimit = 15u;
-    static constexpr auto kMaxCurrentBooks = 5u; 
+    static constexpr auto kMaxCurrentBooks = 5u;
+    CurrentTime time_; 
 
     const std::string endpoint_ = "https://api.telegram.org/bot5659631757:AAEeYIlp3ePkFnxKYXH1yd0bB9AXzgwtOkE/";
     const int64_t channel_id_ = 957596074;

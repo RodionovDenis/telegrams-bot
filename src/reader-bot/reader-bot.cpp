@@ -71,7 +71,12 @@ void ReaderBot::HandleParticipant(const RequestBot& request) {
     }
     std::lock_guard guard(mutex_);
     auto it = currents_id_.find(request.id);
-    if (request.text == "/add_session" && it == currents_id_.end()) {
+    if (request.text == "/registration" && it == currents_id_.end()) {
+        currents_id_.insert(request.id);
+        std::thread{&ReaderBot::RegistrationParticipant, this, request.id}.detach();
+    } else if (config_.users.find(request.id) == config_.users.end()) {
+        api_->SendMessage(request.id, "Сначала необходимо зарегистрироваться");
+    } else if (request.text == "/add_session" && it == currents_id_.end()) {
         currents_id_.insert(request.id);
         std::thread{&ReaderBot::AddSession, this, request}.detach();
     } else if (request.text == "/add_book" && it == currents_id_.end()) {
@@ -97,13 +102,32 @@ void ReaderBot::HandleParticipant(const RequestBot& request) {
 class CancelException: public std::exception {
 };
 
- void ReaderBot::DeleteBook(int64_t id) {
+void ReaderBot::RegistrationParticipant(int64_t id) {
     try {
         std::unique_lock lock(mutex_);
-        if (auto it = config_.users.find(id); (it != config_.users.end()) && (!it->second.current_books.empty())) {
+        if (auto it = config_.users.find(id); it == config_.users.end()) {
+            api_->SendMessage(id, "Выберите своё имя и фамилию. Это должно быть одно сообщение, в котором "
+            "имя и фамилия разделены пробелом.");
+            auto username = GetUsername(id, &lock);
+            config_.users.insert({id, User{.username = username}});
+            api_->SendMessage(id, "Вы успешно зарегистрированы.", RemoveButtons());
+        } else {
+            api_->SendMessage(id, "Вы уже зарегистрированы.");
+        }
+        currents_id_.erase(id);
+    } catch (const CancelException& ex) {
+        api_->SendMessage(id, "Команда отменена.", RemoveButtons());
+    }
+    SaveConfig();
+}
+
+void ReaderBot::DeleteBook(int64_t id) {
+    try {
+        std::unique_lock lock(mutex_);
+        if (auto it =config_.users.find(id); it->second.books.empty()) {
             api_->SendMessage(id, "Выберите книгу для удаления.", GetButtonsBooks(id));
             auto book = GetPatricipantBook(id, &lock);
-            config_.users.at(id).current_books.erase(book);
+            it->second.books.erase(book);
             api_->SendMessage(id, "Книга успешно удалена.", RemoveButtons());
         } else {
             api_->SendMessage(id, "Нечего удалять.");
@@ -116,10 +140,10 @@ class CancelException: public std::exception {
  }
 
 void ReaderBot::ListBooks(int64_t id) {
-    if (auto it = config_.users.find(id); it != config_.users.end() && !it->second.current_books.empty()) {
+    if (auto it = config_.users.find(id); it->second.books.empty()) {
         std::string message = "Список ваших зарегистрированных книг: \n\n";
         int count = 0;
-        for (const auto& book : it->second.current_books) {
+        for (const auto& book : it->second.books) {
             message += fmt::format("{}. {} – {} \n", ++count, book.author, book.name);
         }
         api_->SendMessage(id, message);
@@ -131,12 +155,12 @@ void ReaderBot::ListBooks(int64_t id) {
 void ReaderBot::AddBook(int64_t id) {
     try {
         std::unique_lock lock(mutex_);
-        if (config_.users[id].current_books.size() < kMaxCurrentBooks) {
+        if (config_.users.at(id).books.size() < kMaxCurrentBooks) { 
             api_->SendMessage(id, "Введите автора книги.");
             auto author = WaitRightRequest(id, &lock);
             api_->SendMessage(id, "Введите название книги.");
             auto name = WaitRightRequest(id, &lock);
-            config_.users[id].current_books.insert(Book{.author = *author.text, .name = *name.text});
+            config_.users[id].books.insert(Book{.author = *author.text, .name = *name.text});
             api_->SendMessage(id, "Книга успешно добавлена.");
         } else {
             api_->SendMessage(id, "Превышен лимит на количество книг. Воспользуйтесь удалением.");
@@ -151,8 +175,7 @@ void ReaderBot::AddBook(int64_t id) {
 void ReaderBot::AddSession(const RequestBot& user_data) {
     try {
         std::unique_lock lock(mutex_);
-        auto it = config_.users.find(user_data.id);
-        if (it == config_.users.end() || it->second.current_books.empty()) {
+        if (config_.users.at(user_data.id).books.empty()) {
             api_->SendMessage(user_data.id, "Сначала необходимо добавить хотя бы одну книгу. Добавьте и повторите попытку.");
             currents_id_.erase(user_data.id);
             return;
@@ -173,6 +196,18 @@ void ReaderBot::AddSession(const RequestBot& user_data) {
     SaveConfig();
 }
 
+std::string ReaderBot::GetUsername(int64_t id, std::unique_lock<std::mutex>* lock) {
+    do {
+        auto request = WaitRightRequest(id, lock);
+        auto username = Parse(*request.text, " ");
+        if (username.first.empty() || username.second.empty()) {
+            api_->SendMessage(id, "Некорректное имя пользователя. Введите ещё раз.");
+        } else {
+            return *request.text;
+        }
+    } while (true);
+}
+
 std::pair<int, int> ReaderBot::GetParticipantPages(int64_t id, std::unique_lock<std::mutex>* lock) {
     do {
         auto request = WaitRightRequest(id, lock);
@@ -191,7 +226,7 @@ Book ReaderBot::GetPatricipantBook(int64_t id, std::unique_lock<std::mutex>* loc
     do {
         auto request = WaitRightRequest(id, lock);
         auto book = Parse(*request.text, " – ");
-        auto& books = config_.users.at(id).current_books;
+        auto& books = config_.users.at(id).books;
         if (auto it = books.find(Book{.author = book.first, .name = book.second}); it == books.end()) {
             api_->SendMessage(id, "У вас нет такой книги. Повторите попытку.");
         } else {
@@ -218,7 +253,7 @@ nlohmann::json ReaderBot::GetButtonsBooks(int64_t id) const {
     if (it == config_.users.end()) {
         throw std::runtime_error("id is not exist, it is strange");
     }
-    auto v = it->second.current_books | std::views::transform([](const auto& book) {
+    auto v = it->second.books | std::views::transform([](const auto& book) {
         return book.author + " – " + book.name;
     });
     std::vector<std::vector<std::string>> result;

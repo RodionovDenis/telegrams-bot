@@ -21,6 +21,8 @@ ReaderBot::ReaderBot() : api_(CreateApi(endpoint_, channel_id_)) {
     if (file.is_open()) {
         config_ = nlohmann::json::parse(file);
     }
+    update_thread = std::thread{&ReaderBot::ThreadUpdateSeries, this};
+    reminder_thread = std::thread{&ReaderBot::ThreadReminder, this};
 }
 
 std::optional<int> GetNumber(const std::string& str) {
@@ -49,36 +51,143 @@ std::string ReaderBot::GetReadMe() const {
 
 void ReaderBot::Run() {
     while (true) {
-        try {
-            auto responses = api_->GetUpdates(config_.offset, 3600u);
-            config_.offset = responses.first;
-            for (const auto& request: responses.second) {
-                if (request.sender_type != SenderType::kPerson) {
-                    continue;
-                }
-                HandleParticipant(request);
+        auto responses = api_->GetUpdates(config_.offset, 3600u);
+        std::lock_guard guard(thread_mutex_);
+        config_.offset = responses.first;
+        for (const auto& request: responses.second) {
+            if (request.sender_type != SenderType::kPerson) {
+                continue;
             }
-        } catch (std::exception& ex) {
-            std::cout << ex.what() << std::endl;
+            HandleParticipant(request);
         } 
     }
 }
 
+auto ReaderBot::GetSortPatricipants() {
+    for (auto& user: config_.users) {
+        auto& series = user.second.series; 
+        if (series && series->pages >= kPagesLimit) {
+            series->rounds++;
+            series->pages = 0;
+        } else if (series) {
+            api_->SendMessage(user.first, fmt::format("Ваш ударный режим ({}) сгорел.", 
+                                                       GetSlavicRounds(user.second.series->rounds)));
+            series = std::nullopt;
+        }
+    }
+    static constexpr auto filter = [](const auto& user) { 
+        return user.second.series != std::nullopt; 
+    };
+    static constexpr auto transform = [](const auto& user) { 
+        return std::make_tuple(user.second.series->rounds, user.second.all_pages, user.first, user.second.username);
+    };
+    auto it = config_.users | std::views::filter(filter) | std::views::transform(transform);
+    std::vector<std::tuple<uint16_t, uint32_t, int64_t, std::string>> v = {it.begin(), it.end()};
+    std::ranges::sort(v, [](const auto& lhs, const auto& rhs) {
+        return std::tie(lhs) > std::tie(rhs);
+    });
+    return v;
+}
+
+void ReaderBot::ThreadReminder() {
+    static const auto sleep_for = [this]() -> uint64_t {
+        auto time = time_.GetCurrentTime();
+        auto day = time_.GetWeekDay();
+        int64_t diff;
+        if (time.hours < 15) {
+            diff = (14 - time.hours) * 3600l + (59 - time.minutes) * 60l + (60 - time.seconds); 
+        } else {
+            diff = -((time.hours - 15) * 3600l + time.minutes * 60l + time.seconds);
+        }
+        if ((day == Day::kSunday && time.hours >= 15) || day == Day::kMonday || day == Day::kTuesday || 
+            (day == kWednesday && time.hours < 15)) {
+            return (Day::kWednesday - day) * 86400u + diff; 
+        } else {
+            return (Day::kSunday - day) * 86400u + diff;
+        }
+    };
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));
+        std::lock_guard guard(thread_mutex_);
+        for (const auto& user: config_.users) {
+            if (user.second.series && user.second.series->rounds > 0 && 
+                user.second.series->pages < kPagesLimit) {
+                api_->SendMessage(user.first, fmt::format("До завершения текущего раунда чтения осталось 9 часов. "
+                                "Чтобы продлить ваш ударный режим до {}, вам необходимо прочитать ещё {}. "
+                                "Поторопитесь!", GetSlavicRounds(user.second.series->rounds + 1), 
+                                GetSlavicPages(kPagesLimit - user.second.series->pages)));
+            }
+        }
+    }
+}
+
+void ReaderBot::SendStatictics(auto&& sort_vector, const std::string& interval) {
+    if (sort_vector.empty()) {
+        api_->SendMessage(channel_id_, "Статистика ударных режимов отсутствует.");
+    }
+    std::string message = fmt::format("Статистика участников после интервала {}.\n\n", interval);
+    auto count = 0;
+    for (const auto& [rounds, all_pages, id, username]: sort_vector) {
+        message += fmt::format("{}. {} – {} (всего прочитано {}).\n", 
+                                ++count, GetReferenceMessage(username, id), 
+                                GetSlavicRounds(rounds), GetSlavicPages(all_pages));
+    }
+    api_->SendMessage(channel_id_, message);
+}
+
+void ReaderBot::ThreadUpdateSeries() {
+    static const auto sleep_for = [this]() -> uint64_t {
+        auto day = time_.GetWeekDay();
+        auto time = time_.GetCurrentTime();
+        auto diff = (23 - time.hours) * 3600ul + (59 - time.minutes) * 60ul + (58 - time.seconds); 
+        if ((Day::kMonday <= day) && (day <= Day::kWednesday)) {
+            return (static_cast<int>(Day::kWednesday) - static_cast<int>(day)) * 86400 + diff;
+        } else if (day == Day::kThursday) {
+            return diff + 2;
+        } else {
+            return (static_cast<int>(Day::kSunday) - static_cast<int>(day)) * 86400 + diff;
+        }
+    };
+    static constexpr auto get_interval = [](const Day& day) {
+        if (day == Day::kMonday || day == Day::kWednesday) {
+            return "понедельник – среда";
+        } else {
+            return "пятница – воскресенье";
+        }
+    };
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(sleep_for()));
+        std::lock_guard guard(thread_mutex_);
+        auto day = time_.GetWeekDay();
+        if (day == Day::kFriday) {
+            api_->SendMessage(channel_id_, "Начало интервала пятница – воскресенье.");
+            break;
+        }
+        SendStatictics(GetSortPatricipants(), get_interval(day));
+        api_->SendMessage(channel_id_, fmt::format("Завершение интервала {}.", get_interval(day)));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
+        day = time_.GetWeekDay();
+        api_->SendMessage(channel_id_, fmt::format("Начало интервала {}.", get_interval(day))); 
+        SaveConfig();
+    }
+}
+
 void ReaderBot::HandleParticipant(const RequestBot& request) {
-    if (request.text == "/start") {
+    if (request.text == "/info") {
         auto str = GetReadMe();
         api_->SendMessage(request.id, str);
     }
-    std::lock_guard guard(mutex_);
+    std::lock_guard guard(handle_request_mutex_);
     auto it = currents_id_.find(request.id);
-    if (request.text == "/registration" && it == currents_id_.end()) {
+    if (request.text == "/start" && it == currents_id_.end()) {
         currents_id_.insert(request.id);
         std::thread{&ReaderBot::RegistrationParticipant, this, request.id}.detach();
-    } else if (config_.users.find(request.id) == config_.users.end()) {
-        api_->SendMessage(request.id, "Сначала необходимо зарегистрироваться");
-    } else if (request.text == "/add_session" && it == currents_id_.end()) {
+    } else if (request.text == "/add_session" && it == currents_id_.end() && time_.GetWeekDay() != Day::kThursday) {
         currents_id_.insert(request.id);
         std::thread{&ReaderBot::AddSession, this, request}.detach();
+    } else if (request.text == "/add_session" && it == currents_id_.end() && time_.GetWeekDay() == Day::kThursday) {
+        api_->SendMessage(request.id, "Сегодня четверг - выходной день. Запрещено отправлять сеансы чтения. "
+                                      "Вы сможете сделать это завтра, когда начнется новый раунд.");
     } else if (request.text == "/add_book" && it == currents_id_.end()) {
         currents_id_.insert(request.id);
         std::thread{&ReaderBot::AddBook, this, request.id}.detach();
@@ -104,26 +213,26 @@ class CancelException: public std::exception {
 
 void ReaderBot::RegistrationParticipant(int64_t id) {
     try {
-        std::unique_lock lock(mutex_);
+        std::unique_lock lock(handle_request_mutex_);
         if (auto it = config_.users.find(id); it == config_.users.end()) {
-            api_->SendMessage(id, "Выберите своё имя и фамилию. Это должно быть одно сообщение, в котором "
-            "имя и фамилия разделены пробелом.");
+            api_->SendMessage(id, "Введите своё имя и фамилию. Это должно быть одно сообщение, в котором "
+            "имя и фамилия разделены пробелом.\n\nP.S. Это нужно для того, чтобы другие пользователи понимали, кто вы :)");
             auto username = GetUsername(id, &lock);
             config_.users.insert({id, User{.username = username}});
-            api_->SendMessage(id, "Вы успешно зарегистрированы.", RemoveButtons());
+            api_->SendMessage(id, "Супер. Вы успешно зарегистрированы.", RemoveButtons());
         } else {
             api_->SendMessage(id, "Вы уже зарегистрированы.");
         }
         currents_id_.erase(id);
     } catch (const CancelException& ex) {
-        api_->SendMessage(id, "Команда отменена.", RemoveButtons());
+        api_->SendMessage(id, "Регистрация отменена.", RemoveButtons());
     }
     SaveConfig();
 }
 
 void ReaderBot::DeleteBook(int64_t id) {
     try {
-        std::unique_lock lock(mutex_);
+        std::unique_lock lock(handle_request_mutex_);
         if (auto it =config_.users.find(id); it->second.books.empty()) {
             api_->SendMessage(id, "Выберите книгу для удаления.", GetButtonsBooks(id));
             auto book = GetPatricipantBook(id, &lock);
@@ -140,7 +249,7 @@ void ReaderBot::DeleteBook(int64_t id) {
  }
 
 void ReaderBot::ListBooks(int64_t id) {
-    if (auto it = config_.users.find(id); it->second.books.empty()) {
+    if (auto it = config_.users.find(id); !it->second.books.empty()) {
         std::string message = "Список ваших зарегистрированных книг: \n\n";
         int count = 0;
         for (const auto& book : it->second.books) {
@@ -154,7 +263,7 @@ void ReaderBot::ListBooks(int64_t id) {
 
 void ReaderBot::AddBook(int64_t id) {
     try {
-        std::unique_lock lock(mutex_);
+        std::unique_lock lock(handle_request_mutex_);
         if (config_.users.at(id).books.size() < kMaxCurrentBooks) { 
             api_->SendMessage(id, "Введите автора книги.");
             auto author = WaitRightRequest(id, &lock);
@@ -174,8 +283,9 @@ void ReaderBot::AddBook(int64_t id) {
 
 void ReaderBot::AddSession(const RequestBot& user_data) {
     try {
-        std::unique_lock lock(mutex_);
-        if (config_.users.at(user_data.id).books.empty()) {
+        std::unique_lock lock(handle_request_mutex_);
+        auto it = config_.users.find(user_data.id);
+        if (it->second.books.empty()) {
             api_->SendMessage(user_data.id, "Сначала необходимо добавить хотя бы одну книгу. Добавьте и повторите попытку.");
             currents_id_.erase(user_data.id);
             return;
@@ -189,11 +299,26 @@ void ReaderBot::AddSession(const RequestBot& user_data) {
         auto retell = WaitRightRequest(user_data.id, &lock);
         api_->SendMessage(user_data.id, fmt::format("Поздравляю! Вы прочитали {}. Ваш сеанс добавлен.", 
                                                     GetSlavicPages(pages.second - pages.first + 1)));
+        if (!it->second.series) {
+            it->second.series = ShockSeries{.rounds = 0, .last_activity = user_data.time, .pages = pages.second - pages.first + 1};
+        } else {
+            it->second.series->last_activity = user_data.time;
+            it->second.series->pages += pages.second - pages.first + 1;
+        }
+        it->second.all_pages += pages.second - pages.first + 1;
+        SendRetell(user_data.id, user_data.username, pages.second - pages.first + 1, book, *retell.text);
         currents_id_.erase(user_data.id);
     } catch (const CancelException& ex) {
         api_->SendMessage(user_data.id, "Команда отменена.", RemoveButtons());
     }
     SaveConfig();
+}
+
+void ReaderBot::SendRetell(int64_t id, const std::string& username, int pages, const Book& book, 
+                           const std::string& retell) {
+    api_->SendMessage(channel_id_, fmt::format("{} прочитал(а) {}.\n\nАвтор: {}.\nНазвание книги: {}.\n\n"
+                                   "Краткий пересказ: ||{}||", GetReferenceMessage(username, id), 
+                                    GetSlavicPages(pages), book.author, book.name, retell));
 }
 
 std::string ReaderBot::GetUsername(int64_t id, std::unique_lock<std::mutex>* lock) {
@@ -208,7 +333,7 @@ std::string ReaderBot::GetUsername(int64_t id, std::unique_lock<std::mutex>* loc
     } while (true);
 }
 
-std::pair<int, int> ReaderBot::GetParticipantPages(int64_t id, std::unique_lock<std::mutex>* lock) {
+std::pair<uint32_t, uint32_t> ReaderBot::GetParticipantPages(int64_t id, std::unique_lock<std::mutex>* lock) {
     do {
         auto request = WaitRightRequest(id, lock);
         auto pages = Parse(*request.text, "-");

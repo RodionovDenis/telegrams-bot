@@ -7,11 +7,6 @@
 
 #include "push-up-bot.h"
 
-static std::string GetReferenceMessage(const std::string& username, uint64_t id) {
-    static constexpr auto reference = "[{}](tg://user?id={})";
-    return fmt::format(reference, username, id);
-}
-
 void PushUpBot::ResetStats() {
     std::erase_if(config_.stats, [this](const auto& pair) {
         return time_.DiffDays(time_.GetUnixTime(), pair.second.last_activity) > 1;

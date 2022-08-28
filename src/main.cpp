@@ -4,6 +4,5 @@
 
 int main() {
     //PushUpBot().Run();
-    //ReaderBot().Run();
-    std::cout << CurrentTime().DiffIntervals(1661529518, 1660319939) << std::endl;
+    ReaderBot().Run();
 }

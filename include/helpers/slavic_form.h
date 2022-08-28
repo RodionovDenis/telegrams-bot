@@ -29,3 +29,8 @@ std::string GetSlavicPages(int n) {
     static constexpr std::array pages = {"страниц", "страницу", "страницы"};
     return fmt::format("{} {}", n, pages[GetSlavicForm(n)]);
 }
+
+std::string GetSlavicRounds(int n) {
+    static constexpr std::array rounds = {"раундов", "раунд", "раунда"};
+    return fmt::format("{} {}", n, rounds[GetSlavicForm(n)]);
+}

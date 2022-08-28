@@ -43,36 +43,46 @@ inline void from_json(const nlohmann::json& j, Book& b) {
     b.name = j.at("name");
 }
 
-inline void to_json(nlohmann::json& j, std::optional<Statistic> s) {
+inline void to_json(nlohmann::json& j, std::optional<ShockSeries> s) {
     if (!s) {
         return;
     }
-    j["stat"] = {{"rounds", s->rounds}, 
+    j = {{"rounds", s->rounds}, 
          {"last_activity", s->last_activity},
          {"pages", s->pages}};
 }
 
-inline void from_json(const nlohmann::json& j, std::optional<Statistic>& s) {
-    auto it = j.find("stat");
+inline void from_json(const nlohmann::json& j, std::optional<ShockSeries>& s) {
+    auto it = j.find("series");
     if (it != j.end()) {
-        s = Statistic{
+        s = ShockSeries{
             .rounds = it->at("rounds"),
             .last_activity = it->at("last_activity"),
-            .pages = it->at("pages")
+            .pages = it->at("all_pages")
         };
     }
 }
 
 inline void to_json(nlohmann::json& j, User u) {
-    j = {{"username", std::move(u.username)}, 
-         {"stat", std::move(u.stat)}, 
-         {"books", std::move(u.books)}};
+    j = {{"username", std::move(u.username)},
+         {"all_pages", u.all_pages}};
+    if (u.series) {
+        j["series"] = std::move(u.series);
+    }
+    if (!u.books.empty()) {
+        j["books"] = std::move(u.books); 
+    }
 }
 
 inline void from_json(const nlohmann::json& j, User& u) {
     u.username = j.at("username");
-    u.stat = j.at("stat");
-    j.at("books").get_to(u.books);
+    u.all_pages = j.at("all_pages");
+    if (auto it = j.find("series"); it != j.end()) {
+        u.series = j["series"];
+    }
+    if (auto it = j.find("books"); it != j.end()) {
+        j["books"].get_to(u.books);
+    }
 }
 
 inline void to_json(nlohmann::json& j, FileConfigReader config) {

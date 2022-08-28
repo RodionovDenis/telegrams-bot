@@ -9,7 +9,7 @@ struct Time {
     uint16_t seconds;
 };
 
-enum class Day {kMonday, kTuesday, kWednesday, kThursday, kFriday, kSaturday, kSunday};
+enum Day {kMonday, kTuesday, kWednesday, kThursday, kFriday, kSaturday, kSunday};
 
 class CurrentTime {
 public:

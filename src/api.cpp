@@ -5,6 +5,7 @@
 #include <Poco/JSON/Parser.h>
 
 #include "api.h"
+#include "fmt/format.h"
 
 class ApiTelegram : public IApiTelegram {
 public:
@@ -106,6 +107,11 @@ std::pair<uint64_t, std::vector<RequestBot>> ApiTelegram::GetUpdates(uint64_t of
 
 std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t channel_id) {
     return std::make_unique<ApiTelegram>(endpoint, channel_id);
+}
+
+std::string GetReferenceMessage(const std::string& username, uint64_t id) {
+    static constexpr auto reference = "[{}](tg://user?id={})";
+    return fmt::format(reference, username, id);
 }
 
 std::unordered_map<int64_t, std::string> ApiTelegram::GetChatAdmins() {

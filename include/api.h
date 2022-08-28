@@ -33,5 +33,5 @@ public:
     virtual ~IApiTelegram() = default;
 };
 
-
 std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t channel_id);
+std::string GetReferenceMessage(const std::string& username, uint64_t id);

@@ -22,7 +22,7 @@ void PushUpBot::ShowStats() {
     std::string stats_message = "Статистика ударного режима участников в преддверии " + GetDate() + ":\n\n";
     for (auto i = 0u; i < v.size(); ++i) {
         stats_message += fmt::format("{}. {} — {} ударного режима (с {}).\n", i + 1,
-            GetReferenceMessage(admins_[v[i].first], v[i].first),
+            GetReference(v[i].first, admins_[v[i].first]),
             GetSlavicDays(v[i].second.days),
             v[i].second.start_date);
     }
@@ -40,7 +40,7 @@ std::optional<std::string> PushUpBot::GetReminderMessage() {
     for (const auto& person: v) {
         if (time_.DiffDays(time_.GetUnixTime(), person.second.last_activity)) {
             auto username = admins_.at(person.first);
-            message += fmt::format("{} — {}.\n", GetReferenceMessage(username, person.first),
+            message += fmt::format("{} — {}.\n", GetReference(person.first, username),
                                         GetSlavicDays(person.second.days));
             is_empty = false;
         }

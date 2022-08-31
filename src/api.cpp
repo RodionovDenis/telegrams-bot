@@ -3,6 +3,7 @@
 #include <Poco/Net/HTTPRequest.h>
 #include <Poco/Net/HTTPResponse.h>
 #include <Poco/JSON/Parser.h>
+#include <ranges>
 
 #include "api.h"
 #include "fmt/format.h"
@@ -11,7 +12,9 @@ class ApiTelegram : public IApiTelegram {
 public:
     ApiTelegram(const std::string& endpoint, int64_t channel_id);
     void SendMessage(int64_t chat_id, const std::string& text, 
-                     const std::optional<nlohmann::json>& reply_markup) override;
+                     ParseMode parse_mode,
+                     const nlohmann::json& reply_markup, 
+                     const std::vector<nlohmann::json>& entities) override;
     std::pair<uint64_t, std::vector<RequestBot>> GetUpdates(uint64_t offset, uint16_t timeout) override;
     int64_t GetAdminID(const std::string& name) override;
     std::unordered_map<int64_t, std::string> GetChatAdmins() override;
@@ -40,13 +43,23 @@ Poco::Dynamic::Var ApiTelegram::GetReply(const Poco::URI& uri) {
 }
 
 void ApiTelegram::SendMessage(int64_t chat_id, const std::string& text, 
-                              const std::optional<nlohmann::json>& reply_markup) {
+                              ParseMode parse_mode,
+                              const nlohmann::json& reply_markup, 
+                              const std::vector<nlohmann::json>& entities) {
     Poco::URI uri{endpoint_ + "sendMessage"};
     uri.addQueryParameter("chat_id", std::to_string(chat_id));
     uri.addQueryParameter("text", text);
-    uri.addQueryParameter("parse_mode", "Markdown");
-    if (reply_markup) {
-        uri.addQueryParameter("reply_markup", reply_markup->dump());
+    if (parse_mode == ParseMode::kMarkdown) {
+        uri.addQueryParameter("parse_mode", "Markdown");
+    }
+    if (!reply_markup.empty()) {
+        uri.addQueryParameter("reply_markup", reply_markup.dump());
+    }
+    if (!entities.empty()) {
+        // std::string parameter;
+        // std::ranges::for_each(entities, [&parameter](const auto& j) { parameter += j.dump(); });
+        // uri.addQueryParameter("entities", "[" + parameter + "]");
+        uri.addQueryParameter("entities", nlohmann::json{entities}.front().dump());
     }
     const auto reply = GetReply(uri);
 }
@@ -105,15 +118,6 @@ std::pair<uint64_t, std::vector<RequestBot>> ApiTelegram::GetUpdates(uint64_t of
     return {offset, requests};
 }
 
-std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t channel_id) {
-    return std::make_unique<ApiTelegram>(endpoint, channel_id);
-}
-
-std::string GetReferenceMessage(const std::string& username, uint64_t id) {
-    static constexpr auto reference = "[{}](tg://user?id={})";
-    return fmt::format(reference, username, id);
-}
-
 std::unordered_map<int64_t, std::string> ApiTelegram::GetChatAdmins() {
     Poco::URI uri{endpoint_ + "getChatAdministrators"};
     uri.addQueryParameter("chat_id", std::to_string(channel_id_));
@@ -133,4 +137,28 @@ std::unordered_map<int64_t, std::string> ApiTelegram::GetChatAdmins() {
         admins.emplace(id, username);
     }
     return admins;
+}
+
+std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t channel_id) {
+    return std::make_unique<ApiTelegram>(endpoint, channel_id);
+}
+
+std::string GetReference(int64_t id, const std::optional<std::string>& user) {
+    if (user) {
+        return fmt::format("[{}](tg://user?id={})", id, *user);
+    }
+    return fmt::format("tg://user?id={}", id);
+}
+
+nlohmann::json AddSpoiler(uint32_t offset, uint32_t length) {
+    return  {{"type", "spoiler"}, 
+            {"offset", offset}, 
+            {"length", length}};
+}
+
+nlohmann::json AddTextLink(uint32_t offset, uint32_t length, const std::string& url) {
+    return  {{"type", "text_link"}, 
+             {"offset", offset}, 
+             {"length", length}, 
+             {"url", url}};
 }

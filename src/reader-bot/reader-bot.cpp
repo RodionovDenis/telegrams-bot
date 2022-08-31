@@ -5,6 +5,8 @@
 #include "helpers/slavic_form.h"
 #include <fstream>
 #include <ranges>
+#include <codecvt>
+#include <locale>
 
 static std::pair<std::string, std::string> Parse(const std::string& str, const std::string& del) {
     auto pos = str.find(del);
@@ -129,7 +131,7 @@ void ReaderBot::SendStatictics(auto&& sort_vector, const std::string& interval) 
     auto count = 0;
     for (const auto& [rounds, all_pages, id, username]: sort_vector) {
         message += fmt::format("{}. {} – {} (всего прочитано {}).\n", 
-                                ++count, GetReferenceMessage(username, id), 
+                                ++count, GetReference(id, username), 
                                 GetSlavicRounds(rounds), GetSlavicPages(all_pages));
     }
     api_->SendMessage(channel_id_, message);
@@ -175,14 +177,19 @@ void ReaderBot::ThreadUpdateSeries() {
 void ReaderBot::HandleParticipant(const RequestBot& request) {
     if (request.text == "/info") {
         auto str = GetReadMe();
-        api_->SendMessage(request.id, str);
+        api_->SendMessage(request.id, str, ParseMode::kMarkdown);
     }
     std::lock_guard guard(handle_request_mutex_);
     auto it = currents_id_.find(request.id);
     if (request.text == "/start" && it == currents_id_.end()) {
-        currents_id_.insert(request.id);
-        std::thread{&ReaderBot::RegistrationParticipant, this, request.id}.detach();
-    } else if (request.text == "/add_session" && it == currents_id_.end() && time_.GetWeekDay() != Day::kThursday) {
+        config_.users.insert({request.id, User{.username = request.username}});
+        std::string text = (config_.users.find(request.id) == config_.users.end()) ? 
+                            "Ты стал участником нашего марафона по чтению." :
+                            "Ты уже участвуешь в нашем марафоне по чтению.";
+        api_->SendMessage(request.id, fmt::format("Привет, {}!\n\n{}\n\n"
+                                      "Для получения подробной информации нажми /info.", request.username, text));
+    }
+    else if (request.text == "/add_session" && it == currents_id_.end() && time_.GetWeekDay() != Day::kThursday) {
         currents_id_.insert(request.id);
         std::thread{&ReaderBot::AddSession, this, request}.detach();
     } else if (request.text == "/add_session" && it == currents_id_.end() && time_.GetWeekDay() == Day::kThursday) {
@@ -211,39 +218,20 @@ void ReaderBot::HandleParticipant(const RequestBot& request) {
 class CancelException: public std::exception {
 };
 
-void ReaderBot::RegistrationParticipant(int64_t id) {
-    try {
-        std::unique_lock lock(handle_request_mutex_);
-        if (auto it = config_.users.find(id); it == config_.users.end()) {
-            api_->SendMessage(id, "Введите своё имя и фамилию. Это должно быть одно сообщение, в котором "
-            "имя и фамилия разделены пробелом.\n\nP.S. Это нужно для того, чтобы другие пользователи понимали, кто вы :)");
-            auto username = GetUsername(id, &lock);
-            config_.users.insert({id, User{.username = username}});
-            api_->SendMessage(id, "Супер. Вы успешно зарегистрированы.", RemoveButtons());
-        } else {
-            api_->SendMessage(id, "Вы уже зарегистрированы.");
-        }
-        currents_id_.erase(id);
-    } catch (const CancelException& ex) {
-        api_->SendMessage(id, "Регистрация отменена.", RemoveButtons());
-    }
-    SaveConfig();
-}
-
 void ReaderBot::DeleteBook(int64_t id) {
     try {
         std::unique_lock lock(handle_request_mutex_);
-        if (auto it =config_.users.find(id); it->second.books.empty()) {
-            api_->SendMessage(id, "Выберите книгу для удаления.", GetButtonsBooks(id));
+        if (auto it = config_.users.find(id); !it->second.books.empty()) {
+            api_->SendMessage(id, "Выберите книгу для удаления.", ParseMode::kNone, GetButtonsBooks(id));
             auto book = GetPatricipantBook(id, &lock);
             it->second.books.erase(book);
-            api_->SendMessage(id, "Книга успешно удалена.", RemoveButtons());
+            api_->SendMessage(id, "Книга успешно удалена.", ParseMode::kNone, RemoveButtons());
         } else {
             api_->SendMessage(id, "Нечего удалять.");
         }
         currents_id_.erase(id);
     } catch (const CancelException& ex) {
-        api_->SendMessage(id, "Команда отменена.", RemoveButtons());
+        api_->SendMessage(id, "Команда отменена.", ParseMode::kNone, RemoveButtons());
     }
     SaveConfig();
  }
@@ -290,15 +278,13 @@ void ReaderBot::AddSession(const RequestBot& user_data) {
             currents_id_.erase(user_data.id);
             return;
         }
-        api_->SendMessage(user_data.id, "Выберите книгу, которую читали.", GetButtonsBooks(user_data.id));
+        api_->SendMessage(user_data.id, "Выберите книгу, которую читали.", ParseMode::kNone, GetButtonsBooks(user_data.id));
         auto book = GetPatricipantBook(user_data.id, &lock);
-        api_->SendMessage(user_data.id, "Укажите страницы, которые прочитали (включительно). Страницы должны быть разделены дефисом "
-                                        "(например, 25-73). ", RemoveButtons());
+        api_->SendMessage(user_data.id, "Укажите страницы, которые прочитали. Страницы должны быть разделены дефисом "
+                                        "(например, 25-73). ", ParseMode::kNone, RemoveButtons());
         auto pages = GetParticipantPages(user_data.id, &lock);
         api_->SendMessage(user_data.id, fmt::format("Теперь необходимо отчитаться кратким пересказом. Введите текст."));
         auto retell = WaitRightRequest(user_data.id, &lock);
-        api_->SendMessage(user_data.id, fmt::format("Поздравляю! Вы прочитали {}. Ваш сеанс добавлен.", 
-                                                    GetSlavicPages(pages.second - pages.first + 1)));
         if (!it->second.series) {
             it->second.series = ShockSeries{.rounds = 0, .last_activity = user_data.time, .pages = pages.second - pages.first + 1};
         } else {
@@ -307,18 +293,30 @@ void ReaderBot::AddSession(const RequestBot& user_data) {
         }
         it->second.all_pages += pages.second - pages.first + 1;
         SendRetell(user_data.id, user_data.username, pages.second - pages.first + 1, book, *retell.text);
+        api_->SendMessage(user_data.id, fmt::format("Вы прочитали {}. Ваш сеанс добавлен.", 
+                                                     GetSlavicPages(pages.second - pages.first + 1)));
         currents_id_.erase(user_data.id);
     } catch (const CancelException& ex) {
-        api_->SendMessage(user_data.id, "Команда отменена.", RemoveButtons());
+        api_->SendMessage(user_data.id, "Команда отменена.", ParseMode::kNone, RemoveButtons());
     }
     SaveConfig();
 }
 
+static size_t GetLengthUtf16(const std::string& str) {
+    struct Facet : std::codecvt<char16_t, char, std::mbstate_t> {};
+    std::wstring_convert<Facet, char16_t> converter;
+    return converter.from_bytes(str).size();
+}
+
 void ReaderBot::SendRetell(int64_t id, const std::string& username, int pages, const Book& book, 
                            const std::string& retell) {
-    api_->SendMessage(channel_id_, fmt::format("{} прочитал(а) {}.\n\nАвтор: {}.\nНазвание книги: {}.\n\n"
-                                   "Краткий пересказ: ||{}||", GetReferenceMessage(username, id), 
-                                    GetSlavicPages(pages), book.author, book.name, retell));
+    auto url = GetReference(id);
+    auto text_link = AddTextLink(0, GetLengthUtf16(username), url);
+    auto message = fmt::format("{} прочитал(а) {}.\n\nАвтор книги: {}\nНазвание книги: {}\n\nКраткий пересказ: ", 
+                                username, GetSlavicPages(pages), book.author, book.name);
+    auto spoiler = AddSpoiler(GetLengthUtf16(message), GetLengthUtf16(retell));
+    message += retell;
+    api_->SendMessage(channel_id_, message, ParseMode::kNone, nlohmann::json{}, {text_link, spoiler});
 }
 
 std::string ReaderBot::GetUsername(int64_t id, std::unique_lock<std::mutex>* lock) {

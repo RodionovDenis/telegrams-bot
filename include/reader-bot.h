@@ -50,7 +50,6 @@ public:
     ReaderBot();
     void Run();
     void HandleParticipant(const RequestBot& request);
-    void RegistrationParticipant(int64_t id);
     void AddBook(int64_t id);
     void AddSession(const RequestBot& user_data);
     void DeleteBook(int64_t id);

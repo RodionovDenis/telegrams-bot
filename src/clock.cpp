@@ -41,5 +41,5 @@ uint16_t CurrentTime::DiffIntervals(uint64_t first_time, uint64_t second_time) c
 Day CurrentTime::GetWeekDay() const {
     auto now = std::chrono::system_clock::now() + std::chrono::hours(3);
     auto unix_time = std::chrono::system_clock::to_time_t(now);
-    return static_cast<Day>(((unix_time / kSecondsInDay) + 4) % 7);
+    return static_cast<Day>(((unix_time / kSecondsInDay) + 3) % 7);
 }

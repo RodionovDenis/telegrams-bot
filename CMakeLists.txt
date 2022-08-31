@@ -7,10 +7,11 @@ add_subdirectory(lib/fmt)
 
 find_package(Poco REQUIRED Data Net)
 
-include_directories(include lib)
+include_directories(include lib include/push-up-bot include/reader-bot)
 
-add_library(PushUpBot src/push-up-bot.cpp)
+add_library(PushUpBot src/push-up-bot/push-up-bot.cpp)
 add_library(ReaderBot src/reader-bot/reader-bot.cpp)
+add_library(Conversation src/reader-bot/conversation.cpp)
 add_library(Api src/api.cpp)
 add_library(Clock src/clock.cpp)
 

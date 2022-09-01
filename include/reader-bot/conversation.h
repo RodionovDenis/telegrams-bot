@@ -7,8 +7,7 @@
 
 class IConversation {
 public:
-    virtual void HandleMessage(std::string&& message) = 0;
-    virtual bool IsFinish() = 0;
+    virtual bool Handle(std::string&& message) = 0;
 };
 
 enum class Command {kAddSession, kAddBook, kDeleteBook};

@@ -48,7 +48,6 @@ inline void to_json(nlohmann::json& j, std::optional<ShockSeries> s) {
         return;
     }
     j = {{"rounds", s->rounds}, 
-         {"last_activity", s->last_activity},
          {"pages", s->pages}};
 }
 
@@ -57,7 +56,6 @@ inline void from_json(const nlohmann::json& j, std::optional<ShockSeries>& s) {
     if (it != j.end()) {
         s = ShockSeries{
             .rounds = it->at("rounds"),
-            .last_activity = it->at("last_activity"),
             .pages = it->at("all_pages")
         };
     }

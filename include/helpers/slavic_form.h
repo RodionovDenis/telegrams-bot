@@ -34,3 +34,8 @@ std::string GetSlavicRounds(int n) {
     static constexpr std::array rounds = {"раундов", "раунд", "раунда"};
     return fmt::format("{} {}", n, rounds[GetSlavicForm(n)]);
 }
+
+std::string GetSlavicBook(int n) {
+    static constexpr std::array books = {"книг", "книги", "книги"};
+    return fmt::format("{} {}", n, books[GetSlavicForm(n)]);
+}

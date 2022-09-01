@@ -18,6 +18,7 @@ add_library(Clock src/clock.cpp)
 add_executable(Bots src/main.cpp)
 
 target_link_libraries(Api PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON fmt)
+target_link_libraries(Conversation fmt)
 target_link_libraries(Clock fmt)
 target_link_libraries(PushUpBot fmt pthread)
 target_link_libraries(ReaderBot fmt pthread)

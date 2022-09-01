@@ -286,9 +286,8 @@ void ReaderBot::AddSession(const RequestBot& user_data) {
         api_->SendMessage(user_data.id, fmt::format("Теперь необходимо отчитаться кратким пересказом. Введите текст."));
         auto retell = WaitRightRequest(user_data.id, &lock);
         if (!it->second.series) {
-            it->second.series = ShockSeries{.rounds = 0, .last_activity = user_data.time, .pages = pages.second - pages.first + 1};
+            it->second.series = ShockSeries{.rounds = 0, .pages = pages.second - pages.first + 1};
         } else {
-            it->second.series->last_activity = user_data.time;
             it->second.series->pages += pages.second - pages.first + 1;
         }
         it->second.all_pages += pages.second - pages.first + 1;

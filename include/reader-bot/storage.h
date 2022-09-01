@@ -21,7 +21,6 @@ public:
 
 struct ShockSeries {
     uint16_t rounds = 0;
-    uint64_t last_activity = 0;
     uint32_t pages = 0;
 };
 

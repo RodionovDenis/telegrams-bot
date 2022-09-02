@@ -20,8 +20,9 @@ public:
 };
 
 struct ShockSeries {
-    uint16_t rounds = 0;
-    uint32_t pages = 0;
+    static constexpr auto kLimitPages = 15u;
+    uint32_t rounds = 0;
+    uint16_t pages = 0;
 };
 
 struct User {

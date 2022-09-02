@@ -16,5 +16,5 @@ protected:
     bool is_finish_ = false;
 };
 
-enum class Command {kAddSession, kAddBook, kDeleteBook};
-std::unique_ptr<IConversation> CreateConversation(int64_t id, IApiTelegram* api, User* user, Command command);
+std::unique_ptr<IConversation> CreateConversation(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, 
+                                                  const std::string& command);

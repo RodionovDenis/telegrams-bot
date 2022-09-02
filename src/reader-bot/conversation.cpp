@@ -153,16 +153,17 @@ private:
     }
 
     std::string GetAddSessionFinish() {
-        auto pages = user_->series->pages;
-        if (pages < kLimitPages) {
+        auto pages = user_->series->pages; 
+        if (pages < ShockSeries::kLimitPages) {
             return fmt::format("\n\nЧтобы остаться в ударном режиме, вам необходимо прочитать еще {} "
-                "в текущем раунде.", GetSlavicPages(kLimitPages - pages));
-        } else if (pages > kLimitPages) {
+                "в текущем раунде.", GetSlavicPages(ShockSeries::kLimitPages - pages));
+        } else if (pages > ShockSeries::kLimitPages) {
             return fmt::format("\n\nВ текущем раунде вы прочитали на {} больше минимума. "
-                "Соответственно, вы остаетесь в ударном режиме.", GetSlavicPages(pages - kLimitPages));
+                "Соответственно, вы остаетесь в ударном режиме.", 
+                GetSlavicPages(pages - ShockSeries::kLimitPages));
         }
         return fmt::format("\n\nВ текущем раунде вы прочитали {}. Вы остаетесь в ударном режиме.", 
-                GetSlavicPages(kLimitPages));
+                GetSlavicPages(ShockSeries::kLimitPages));
     }
 
     void SendRetellMessage() {
@@ -198,8 +199,6 @@ private:
     uint32_t pages_;
     std::string retell_;
 
-    static constexpr auto kLimitPages = 15;
-
     enum State {kWaitBook, kWaitPages, kWaitRetell};
     State state_;
     std::unordered_map<State, void (AddSession::*)(std::string&)> handles_;
@@ -209,3 +208,14 @@ private:
     IApiTelegram* api_;
     User* user_;
 };
+
+std::unique_ptr<IConversation> CreateConversation(int64_t id, int channel_id, IApiTelegram* api, User* user, 
+                                                  const std::string& command) {
+        if (command == "/add_book") {
+            return std::make_unique<AddBook>(id, api, user);
+        } else if (command == "/delete_book") {
+            return std::make_unique<DeleteBook>(id, api, user);
+        } else {
+            return std::make_unique<AddSession>(id, channel_id, api, user);
+        }
+    }

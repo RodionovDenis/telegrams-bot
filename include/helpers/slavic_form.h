@@ -1,8 +1,9 @@
 #pragma once
+
 #include <string>
 #include <fmt/format.h>
 
-int GetSlavicForm(int number) {
+inline int GetSlavicForm(int number) {
     if ((number % 100 >= 5 && number % 100 <= 20) ||
         (number % 10 >= 5 && number % 10 <= 9) || number % 10 == 0) {
         return 0;
@@ -15,27 +16,27 @@ int GetSlavicForm(int number) {
     }
 }
 
-std::string GetSlavicDays(int n) {
+inline std::string GetSlavicDays(int n) {
     static constexpr std::array days = {"дней", "день", "дня"};
     return fmt::format("{} {}", n,  days[GetSlavicForm(n)]);
 }
 
-std::string GetSlavicHours(int n) {
+inline std::string GetSlavicHours(int n) {
     static constexpr std::array hours = {"часов", "час", "часа"};
     return fmt::format("{} {}", n,  hours[GetSlavicForm(n)]);
 }
 
-std::string GetSlavicPages(int n) {
+inline std::string GetSlavicPages(int n) {
     static constexpr std::array pages = {"страниц", "страницу", "страницы"};
     return fmt::format("{} {}", n, pages[GetSlavicForm(n)]);
 }
 
-std::string GetSlavicRounds(int n) {
+inline std::string GetSlavicRounds(int n) {
     static constexpr std::array rounds = {"раундов", "раунд", "раунда"};
     return fmt::format("{} {}", n, rounds[GetSlavicForm(n)]);
 }
 
-std::string GetSlavicBook(int n) {
+inline std::string GetSlavicBook(int n) {
     static constexpr std::array books = {"книг", "книги", "книги"};
     return fmt::format("{} {}", n, books[GetSlavicForm(n)]);
 }

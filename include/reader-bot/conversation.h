@@ -8,7 +8,7 @@
 class IConversation {
 public:
     virtual ~IConversation() = default;
-    virtual void Handle(std::string&& message) = 0;
+    virtual void Handle(const std::string& message) = 0;
     bool IsFinish() const {
         return is_finish_;
     }

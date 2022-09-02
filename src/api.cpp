@@ -56,9 +56,6 @@ void ApiTelegram::SendMessage(int64_t chat_id, const std::string& text,
         uri.addQueryParameter("reply_markup", reply_markup.dump());
     }
     if (!entities.empty()) {
-        // std::string parameter;
-        // std::ranges::for_each(entities, [&parameter](const auto& j) { parameter += j.dump(); });
-        // uri.addQueryParameter("entities", "[" + parameter + "]");
         uri.addQueryParameter("entities", nlohmann::json{entities}.front().dump());
     }
     const auto reply = GetReply(uri);

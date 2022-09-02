@@ -18,12 +18,12 @@ public:
         }
     }
 
-    void Handle(std::string&& message) override {
+    void Handle(const std::string& message) override {
         if (author_.empty()) {
             author_ = std::move(message);
             api_.SendMessage(id_, "Введите название книги.");
         } else {
-            user_.books.insert({author_, std::move(message)});
+            user_.books.insert({author_, message});
             api_.SendMessage(id_, "Книга успешно добавлена.");
             is_finish_ = true;
         }
@@ -38,7 +38,7 @@ private:
     User& user_;
 };
 
-static std::pair<std::string, std::string> Parse(std::string&& str, const std::string& del) {
+static std::pair<std::string, std::string> Parse(const std::string& str, const std::string& del) {
     auto pos = str.find(del);
     if (pos == std::string::npos) {
         throw std::invalid_argument("Invalid");
@@ -68,9 +68,9 @@ static nlohmann::json RemoveButtons() {
     return j;
 }
 
-static Book GetBook(std::string& message, 
+static Book GetBook(const std::string& message, 
                     const std::unordered_set<Book, HashBook>& books) {
-    auto book = Parse(std::move(message), " – ");
+    auto book = Parse(message, " – ");
     if (auto it = books.find(Book{.author = book.first, .name = book.second}); it != books.end()) {
         throw std::invalid_argument("Invalid");
     } else {
@@ -78,7 +78,7 @@ static Book GetBook(std::string& message,
     }
 }
 
-std::pair<int, int> GetNumbers(std::string& str) {
+std::pair<int, int> GetNumbers(const std::string& str) {
     auto parse = Parse(std::move(str), "-");
     auto first = std::stoi(parse.first);
     auto second = std::stoi(parse.second);
@@ -100,7 +100,7 @@ public:
         }
     }
 
-    void Handle(std::string&& message) override try {
+    void Handle(const std::string& message) override try {
         auto book = GetBook(message, user_->books);
         user_->books.erase(book);
         is_finish_ = true;
@@ -132,19 +132,19 @@ public:
         }
     }
 
-    void Handle(std::string&& message) override {
+    void Handle(const std::string& message) override {
         (this->*handles_[state_])(message);
     }
     
 private:
-    void HandleBook(std::string& message) try {
+    void HandleBook(const std::string& message) try {
         book_ = GetBook(message, user_->books);
         state_ = kWaitPages;
     } catch (const std::logic_error&) {
             api_->SendMessage(id_, "У вас нет такой книги. Выберите книгу из списка.");
     }
 
-    void HandlePages(std::string& message) try {
+    void HandlePages(const std::string& message) try {
         auto pages = GetNumbers(message);
         pages_ =  static_cast<uint32_t>(pages.second - pages.first + 1);
         state_ = kWaitPages;
@@ -181,7 +181,7 @@ private:
         api_->SendMessage(channel_id_, message, ParseMode::kNone, nlohmann::json{}, {text_link, spoiler});
     }
 
-    void HandleRetell(std::string& message) {
+    void HandleRetell(const std::string& message) {
         retell_ = std::move(message);
         auto& series = user_->series;
         if (series) {
@@ -196,12 +196,12 @@ private:
     }
 
     Book book_;
-    uint32_t pages_;
+    uint16_t pages_;
     std::string retell_;
 
     enum State {kWaitBook, kWaitPages, kWaitRetell};
     State state_;
-    std::unordered_map<State, void (AddSession::*)(std::string&)> handles_;
+    std::unordered_map<State, void (AddSession::*)(const std::string&)> handles_;
 
     int64_t id_;
     int64_t channel_id_;
@@ -209,13 +209,14 @@ private:
     User* user_;
 };
 
-std::unique_ptr<IConversation> CreateConversation(int64_t id, int channel_id, IApiTelegram* api, User* user, 
+std::unique_ptr<IConversation> CreateConversation(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, 
                                                   const std::string& command) {
         if (command == "/add_book") {
             return std::make_unique<AddBook>(id, api, user);
         } else if (command == "/delete_book") {
             return std::make_unique<DeleteBook>(id, api, user);
-        } else {
+        } else if (command == "/add_session") {
             return std::make_unique<AddSession>(id, channel_id, api, user);
-        }
+        } 
+        throw std::runtime_error("Hard command is not found");
     }

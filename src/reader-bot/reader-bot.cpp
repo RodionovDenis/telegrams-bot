@@ -151,8 +151,49 @@ void ReaderBot::ThreadUpdateSeries() {
     }
 }
 
+void ReaderBot::HandleNotConversation(int64_t id, const std::string& message) {
+    if (auto it = simple_commands_.find(message); it != simple_commands_.end()) {
+        (this->*it->second)(id);
+    } else if (hard_commands_.contains(message)) {
+        auto conv = CreateConversation(id, channel_id_, api_.get(), &config_.users.at(id), message);
+        if (!conv->IsFinish()) {
+            current_convers_.emplace(id, std::move(conv));
+        }
+    } else if (message == "/cancel") {
+        api_->SendMessage(id, "Команда не выполняется, мне нечего отменить.");
+    } else {
+        api_->SendMessage(id, "Вы ввели что-то странное, какую команду мне выполнять? Выберите ее в меню.");
+    }
+}
+
+void ReaderBot::HandleExistConversation(int64_t id, const std::string& message, Iter it_conv) {
+    auto is_command = simple_commands_.contains(message) || hard_commands_.contains(message);
+    auto& conv = *it_conv->second;
+    if (message == "/cancel") {
+        current_convers_.erase(it_conv);
+        api_->SendMessage(id, fmt::format("Команда {} отменена.", message));
+    } else if (is_command) {
+        api_->SendMessage(id, "Очень странно, что ваш ответ – это команда для бота. Если вы "
+            "хотите воспользоваться другой командой, сначала вам следует отменить текущую команду "
+            "с помощью /cancel.");
+    } else if (conv.Handle(message); conv.IsFinish()) {
+        current_convers_.erase(it_conv);
+    }
+}
+
 void ReaderBot::HandleRequest(const RequestBot& request) {
-    /// ......
+    config_.users.try_emplace(request.id, User{});
+    auto id = request.id;
+    const auto& message = *request.text;
+    auto it = current_convers_.find(id);
+    if (it != current_convers_.end()) {
+        HandleExistConversation(id, message, it);
+    } else {
+        HandleNotConversation(id, message);
+    }
+    // if (it->second->IsFinish()) {
+    //     current_convers_.erase(it);
+    // }
     SaveConfig();
 }
 

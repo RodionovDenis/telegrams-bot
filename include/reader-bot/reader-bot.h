@@ -20,17 +20,24 @@ public:
 
 private:
     void HandleRequest(const RequestBot& request);
-    
+
+    std::unordered_map<int64_t, std::unique_ptr<IConversation>> current_convers_;
+    using Iter = decltype(current_convers_)::iterator;
+
+    void HandleNotConversation(int64_t id, const std::string& message);
+    void HandleExistConversation(int64_t id, const std::string& message, Iter it_conv);
 
     void SendStart(int64_t id) const;
     void SendInfo(int64_t id) const;
     void SendListBooks(int64_t id) const;
-    const std::unordered_map<const char*, void (ReaderBot::*)(int64_t) const> simples_command_
+    const std::unordered_map<std::string, void (ReaderBot::*)(int64_t) const> simple_commands_
         = {{"/start", &ReaderBot::SendStart},
            {"/info", &ReaderBot::SendInfo},
            {"/my_books", &ReaderBot::SendListBooks}};
 
     void HandleCancel(int64_t id);
+    std::unordered_set<std::string> hard_commands_ 
+        = {"/add_session", "add_book", "delete_book"};
 
     void ThreadUpdateSeries();
     void ThreadReminder();
@@ -43,8 +50,7 @@ private:
     std::unique_ptr<IApiTelegram> api_;
 
     FileConfigReader config_;
-    CurrentTime time_;
-    std::unordered_map<int64_t, std::unique_ptr<IConversation>> current_convers_; 
+    CurrentTime time_; 
 
     std::mutex mutex_;
     std::thread update_thread_;

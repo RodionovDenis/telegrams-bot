@@ -44,10 +44,9 @@ private:
     void SaveConfig();
     void SendReminder(int64_t id) const;
 
-    void UpdateSeries();
-    void SendTopPageSeries();
-    void SendTopShockSeries();
-    void SendTopAllPages();
+    void SendPages();
+    void SendRounds();
+    void SendAllPages();
 
     const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
     const int64_t channel_id_ = -1001481144373;

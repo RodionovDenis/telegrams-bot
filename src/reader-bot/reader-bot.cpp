@@ -44,79 +44,80 @@ void ReaderBot::Run() {
     }
 }
 
-void ReaderBot::UpdateSeries() {
-    for (auto& user: config_.users) {
-        auto& series = user.second.series; 
-        if (series && series->pages >= ShockSeries::kLimitPages) {
-            series->pages = 0;
-        } else if (series) {
-            api_->SendMessage(user.first, fmt::format("Ваш ударный режим ({}) сгорел.", 
-                                                       GetSlavicRounds(user.second.series->rounds)));
-            series = std::nullopt;
-        }
+void ReaderBot::SendPages() {
+    static constexpr auto kFilter = [](const auto& pair) {
+        return pair.second.series.has_value() && pair.second.series->pages;
+    };
+    static constexpr auto kTransform = [](const auto& pair) {
+        return std::make_pair(pair.first, pair.second.series->pages);
+    };
+    auto views = config_.users | std::views::filter(kFilter) | std::views::transform(kTransform);
+    std::vector v(views.begin(), views.end());
+    std::ranges::sort(v, std::greater{}, &decltype(v)::value_type::second);
+    int count = 0;
+    std::string message = "Рейтинг участников по количеству прочитанных страниц в текущем раунде.\n\n";
+    for (const auto& [id, pages]: v) {
+        message += fmt::format("{}. {} – {}.\n", ++count, GetReference(id, config_.users.at(id).username),
+            GetSlavicPages(pages));
+    }
+    if (count) {
+        api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
+    } else {
+        api_->SendMessage(channel_id_, "В этом раунде никто не читал книги...");
     }
 }
 
-void ReaderBot::SendTopPageSeries() {
+void ReaderBot::SendRounds() {
     static constexpr auto kFilter = [](const auto& pair) {
         return pair.second.series.has_value();
     };
-    static constexpr auto kTransform = [](const auto& pair) {
-        return std::make_pair(pair.second.series->pages, pair.first);
+    static constexpr auto kTransform = [](auto& pair) {
+        auto& series = pair.second.series;
+        uint32_t rounds; 
+        if (series->pages < ShockSeries::kLimitPages) {
+            rounds = series->rounds;
+            series = std::nullopt;
+        } else {
+            rounds = ++series->rounds;
+            series->pages = 0;
+        }
+        return std::make_tuple(pair.first, series.has_value(), rounds);
     };
     auto views = config_.users | std::views::filter(kFilter) | std::views::transform(kTransform);
-    std::vector<std::pair<uint16_t, int64_t>> v = {views.begin(), views.end()};
-    std::ranges::sort(v, [](const auto& lhs, const auto& rhs) {
-        return lhs.first > rhs.first;
-    });
-    int count = 0;
-    std::string message = "Рейтинг участников по количеству прочитанных страниц в текущем раунде.\n\n";
-    for (const auto& [pages, id]: v) {
-        message += fmt::format("{}. {} – {}.\n", ++count, GetReference(id, config_.users.at(id).username), 
-            GetSlavicPages(pages));
+    std::vector v(views.begin(), views.end());
+    std::ranges::sort(v, std::greater{}, [](const auto& tuple) { return std::get<2>(tuple); });
+    auto save = std::make_pair(std::string("Участники, у которых *есть* ударный режим.\n\n"), 0);
+    auto lost = std::make_pair(std::string("Участники, *потерявшие* свой ударный режим. \n\n"), 0);
+    for (const auto& [id, is_series, rounds]: v) {
+        if (is_series) {
+            save.first += fmt::format("{}. {} – теперь твой ударный режим {}.\n", ++save.second, 
+                GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
+        } else if (rounds) {
+            lost.first += fmt::format("{}. {} – твой ударный режим ({}) сгорел.\n", ++lost.second, 
+            GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
+        }
     }
-    if (count == 0) {
-        api_->SendMessage(channel_id_, "В этом раунде никто не читал книги...");
-    } else {
-        api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
+    if (save.second) {
+        api_->SendMessage(channel_id_, save.first, ParseMode::kMarkdown);
+    }
+    if (lost.second) {
+        api_->SendMessage(channel_id_, lost.first, ParseMode::kMarkdown);
     }
 }
 
-void ReaderBot::SendTopShockSeries() {
-    static constexpr auto kTransform = [](auto& pair) {
-        pair.second.series->rounds++;
-        return std::make_pair(pair.second.series->rounds, pair.first);
+void ReaderBot::SendAllPages() {
+    static constexpr auto kFilter = [](const auto& pair) -> bool {
+        return pair.second.all_pages;
     };
-    auto views = config_.users | std::views::transform(kTransform);
-    std::vector<std::pair<uint32_t, int64_t>> v = {views.begin(), views.end()};
-    std::ranges::sort(v, [](const auto& lhs, const auto& rhs) {
-        return lhs.first > rhs.first;
-    });
-    int count = 0;
-    std::string message = "Участники, сохранившие свой ударный режим.\n\n";
-    for (const auto& [rounds, id]: v) {
-        message += fmt::format("{}. {} – теперь твой ударный {}.\n", ++count, GetReference(id, config_.users.at(id).username), 
-            GetSlavicRounds(rounds));
-    }
-    if (count == 0) {
-        api_->SendMessage(channel_id_, "В этом раунде никто не обновил свой ударный режим...");
-    } else {
-        api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
-    }
-}
-
-void ReaderBot::SendTopAllPages() {
     static constexpr auto kTransform = [](const auto& pair) {
-        return std::make_pair(pair.second.all_pages, pair.first);
+        return std::make_pair(pair.first, pair.second.all_pages);
     };
-    auto views = config_.users | std::views::transform(kTransform);
-    std::vector<std::pair<uint32_t, int64_t>> v = {views.begin(), views.end()};
-    std::ranges::sort(v, [](const auto& lhs, const auto& rhs) {
-        return lhs.first > rhs.first;
-    });
+    auto views = config_.users | std::views::filter(kFilter) | std::views::transform(kTransform);
+    std::vector v(views.begin(), views.end());
+    std::ranges::sort(v, std::greater{}, &decltype(v)::value_type::second);
     int count = 0;
-    std::string message = "Рейтинг участников по количеству прочитанных страниц.\n\n";
-    for (const auto& [pages, id]: v) {
+    std::string message = "Рейтинг участников по количеству прочитанных страниц за всё время.\n\n";
+    for (const auto& [id, pages]: v) {
         message += fmt::format("{}. {} – {}.\n", ++count, GetReference(id, config_.users.at(id).username), 
             GetSlavicPages(pages));
     }
@@ -154,14 +155,15 @@ void ReaderBot::ThreadReminder() {
 
 void ReaderBot::ThreadUpdateSeries() {
     static constexpr auto kUntil = []() {
-        const auto& [time, days, weekday] = GetTimeDaysWeek();
-        if (weekday == std::chrono::Monday || weekday == std::chrono::Tuesday || weekday == std::chrono::Wednesday) {
-            return days + (std::chrono::Wednesday - weekday) + std::chrono::days{1};
-        } else if (weekday == std::chrono::Thursday) {
-            return days + std::chrono::days{1};
-        } else {
-            return days + (std::chrono::Sunday - weekday) + std::chrono::days{1};
-        }
+        // const auto& [time, days, weekday] = GetTimeDaysWeek();
+        // if (weekday == std::chrono::Monday || weekday == std::chrono::Tuesday || weekday == std::chrono::Wednesday) {
+        //     return days + (std::chrono::Wednesday - weekday) + std::chrono::days{1};
+        // } else if (weekday == std::chrono::Thursday) {
+        //     return days + std::chrono::days{1};
+        // } else {
+        //     return days + (std::chrono::Sunday - weekday) + std::chrono::days{1};
+        // }
+        return std::chrono::minutes{1};
     };
     static constexpr auto kGetInterval = [](std::chrono::weekday day) {
         if (day == std::chrono::Monday || day == std::chrono::Wednesday) {
@@ -171,22 +173,20 @@ void ReaderBot::ThreadUpdateSeries() {
         }
     };
     while (true) {
-        //std::this_thread::sleep_until(kUntil() - std::chrono::seconds{2});
         std::this_thread::sleep_for(kUntil());
         std::lock_guard guard(mutex_);
         auto weekday = std::get<2>(GetTimeDaysWeek());
         if (weekday == std::chrono::Thursday) {
             std::this_thread::sleep_for(std::chrono::seconds{2});
-            api_->SendMessage(channel_id_, "Начало интервала пятница – воскресенье.");
+            api_->SendMessage(channel_id_, "*Начало интервала пятница – воскресенье.*", ParseMode::kMarkdown);
             break;
         }
-        SendTopPageSeries();
-        UpdateSeries();
-        SendTopShockSeries();
-        SendTopAllPages();
-        api_->SendMessage(channel_id_, fmt::format("Завершение интервала {}.", kGetInterval(weekday)));
+        SendPages();
+        SendRounds();
+        SendAllPages();
+        api_->SendMessage(channel_id_, fmt::format("*Завершение интервала {}.*", kGetInterval(weekday)), ParseMode::kMarkdown);
         std::this_thread::sleep_for(std::chrono::seconds(2));
-        api_->SendMessage(channel_id_, fmt::format("Начало интервала {}.", kGetInterval(++weekday))); 
+        api_->SendMessage(channel_id_, fmt::format("*Начало интервала {}.*", kGetInterval(++weekday)), ParseMode::kMarkdown); 
         SaveConfig();
     }
 }

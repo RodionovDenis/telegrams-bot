@@ -7,7 +7,7 @@
 
 class AddBook: public IConversation {
 public:
-    AddBook(int64_t id, IApiTelegram* api, User* user): id_(id), api_(*api), user_(*user) {
+    AddBook(int64_t id, IApiTelegram* api, User* user) : id_(id), api_(*api), user_(*user) {
         if (user_.books.size() == kLimitBooks) {
             api_.SendMessage(id_, fmt::format("На данный момент действует ограничение – "
                 "у вас может быть не больше {}. Воспользуйтесь удалением, затем повторите попытку.", 
@@ -27,6 +27,10 @@ public:
             api_.SendMessage(id_, "Книга успешно добавлена.");
             is_finish_ = true;
         }
+    }
+
+    std::string What() override {
+        return "/add_book";
     }
 
 private:
@@ -62,7 +66,7 @@ static nlohmann::json GetButtonsBooks(const std::unordered_set<Book, HashBook>& 
     return j;
 }
 
-static nlohmann::json RemoveButtons() {
+nlohmann::json RemoveButtons() {
     nlohmann::json j;
     j["remove_keyboard"] = true;
     return j;
@@ -71,7 +75,7 @@ static nlohmann::json RemoveButtons() {
 static Book GetBook(const std::string& message, 
                     const std::unordered_set<Book, HashBook>& books) {
     auto book = Parse(message, " – ");
-    if (auto it = books.find(Book{.author = book.first, .name = book.second}); it != books.end()) {
+    if (auto it = books.find(Book{.author = book.first, .name = book.second}); it == books.end()) {
         throw std::invalid_argument("Invalid");
     } else {
         return *it;
@@ -88,6 +92,18 @@ std::pair<int, int> GetNumbers(const std::string& str) {
     return {first, second};
 }
 
+size_t GetLengthUtf8(const std::string& message) {
+    return std::ranges::count_if(message, [](char c) {
+        return (c & 0xc0) != 0x80;
+    });
+}
+
+size_t GetLengthUtf16(const std::string& message) {
+    struct Facet : std::codecvt<char16_t, char, std::mbstate_t> {};
+    std::wstring_convert<Facet, char16_t> converter;
+    return converter.from_bytes(message).size();
+}
+
 class DeleteBook: public IConversation {
 public:
     DeleteBook(int64_t id, IApiTelegram* api, User* user) : id_(id), api_(api), user_(user) {
@@ -95,7 +111,7 @@ public:
             api_->SendMessage(id_, "Нечего удалять, у вас нет книг.");
             is_finish_ = true;
         } else {
-            api_->SendMessage(id_, "Выберите книгу, которую хотите удалить", ParseMode::kNone,
+            api_->SendMessage(id_, "Выберите книгу, которую хотите удалить.", ParseMode::kNone,
                 GetButtonsBooks(user_->books));
         }
     }
@@ -103,9 +119,14 @@ public:
     void Handle(const std::string& message) override try {
         auto book = GetBook(message, user_->books);
         user_->books.erase(book);
+        api_->SendMessage(id_, "Книга успешно удалена.", ParseMode::kNone, RemoveButtons());
         is_finish_ = true;
     } catch (const std::invalid_argument&) {
             api_->SendMessage(id_, "У вас нет такой книги. Выберите книгу из списка.");
+    }
+
+    std::string What() override {
+        return "/delete_book";
     }
 
 private:
@@ -135,11 +156,18 @@ public:
     void Handle(const std::string& message) override {
         (this->*handles_[state_])(message);
     }
+
+    std::string What() override {
+        return "/add_session";
+    }
     
 private:
     void HandleBook(const std::string& message) try {
         book_ = GetBook(message, user_->books);
         state_ = kWaitPages;
+        api_->SendMessage(id_, "Книга выбрана. Теперь укажите страницы, которые "
+            "вы прочитали. Это должны быть два числа, разделенные *дефисом* (например, 54-65).", 
+            ParseMode::kMarkdown, RemoveButtons());
     } catch (const std::logic_error&) {
             api_->SendMessage(id_, "У вас нет такой книги. Выберите книгу из списка.");
     }
@@ -147,7 +175,10 @@ private:
     void HandlePages(const std::string& message) try {
         auto pages = GetNumbers(message);
         pages_ =  static_cast<uint32_t>(pages.second - pages.first + 1);
-        state_ = kWaitPages;
+        state_ = kWaitRetell;
+        api_->SendMessage(id_, fmt::format("Принято. Переходим к пересказу.\n\n"
+        "Единственное ограничение на пересказ – не менее *{}* (в среднем, это 2-4 предложения).\n\n"
+        "Введите текст.", GetSlavicSymbols(kLimitSymbols)), ParseMode::kMarkdown);
     } catch (const std::logic_error&) {
             api_->SendMessage(id_, "Некорректный ввод страниц.");
     }
@@ -158,38 +189,40 @@ private:
             return fmt::format("\n\nЧтобы остаться в ударном режиме, вам необходимо прочитать еще {} "
                 "в текущем раунде.", GetSlavicPages(ShockSeries::kLimitPages - pages));
         } else if (pages > ShockSeries::kLimitPages) {
-            return fmt::format("\n\nВ текущем раунде вы прочитали на {} больше минимума. "
-                "Соответственно, вы остаетесь в ударном режиме.", 
+            return fmt::format("\n\nВ текущем раунде вы прочитали на {} больше минимума.\n\n"
+                "Вы остаетесь в ударном режиме.", 
                 GetSlavicPages(pages - ShockSeries::kLimitPages));
         }
-        return fmt::format("\n\nВ текущем раунде вы прочитали {}. Вы остаетесь в ударном режиме.", 
+        return fmt::format("\n\nВ текущем раунде вы прочитали {}.\n\nВы остаетесь в ударном режиме.", 
                 GetSlavicPages(ShockSeries::kLimitPages));
     }
 
     void SendRetellMessage() {
         auto url = GetReference(id_);
-        static constexpr auto kGetLengthUtf16 = [](const std::string& str) -> size_t {
-            struct Facet : std::codecvt<char16_t, char, std::mbstate_t> {};
-            std::wstring_convert<Facet, char16_t> converter;
-            return converter.from_bytes(str).size();
-        };
-        auto text_link = AddTextLink(0, kGetLengthUtf16(user_->username), url);
+        auto text_link = AddTextLink(0, GetLengthUtf16(user_->username), url);
         auto message = fmt::format("{} прочитал(а) {}.\n\nАвтор книги: {}\nНазвание книги: {}\n\nКраткий пересказ: ", 
                                     user_->username, GetSlavicPages(pages_), book_.author, book_.name);
-        auto spoiler = AddSpoiler(kGetLengthUtf16(message), kGetLengthUtf16(retell_));
+        auto spoiler = AddSpoiler(GetLengthUtf16(message), GetLengthUtf16(retell_));
         message += retell_;
         api_->SendMessage(channel_id_, message, ParseMode::kNone, nlohmann::json{}, {text_link, spoiler});
     }
 
     void HandleRetell(const std::string& message) {
+        auto length = GetLengthUtf8(message);
+        if (length < kLimitSymbols) {
+            api_->SendMessage(id_, fmt::format("Пересказ не засчитан. У него на {} меньше минимума.\n\n"
+            "Повторите попытку.", GetSlavicSymbols(kLimitSymbols - length)));
+            return;
+        }
         retell_ = std::move(message);
         auto& series = user_->series;
-        if (series) {
-            series = ShockSeries{.rounds = 0, .pages = pages_};
-        } else {
+        if (series) { 
             series->pages += pages_;
+        } else {
+            series = ShockSeries{.rounds = 0, .pages = pages_};
         }
-        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ван сеанс добавлен. {}", GetSlavicPages(pages_), 
+        user_->all_pages += pages_;
+        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ваш сеанс добавлен. {}", GetSlavicPages(pages_), 
             GetAddSessionFinish()));
         SendRetellMessage();
         is_finish_ = true;
@@ -198,6 +231,7 @@ private:
     Book book_;
     uint16_t pages_;
     std::string retell_;
+    static constexpr auto kLimitSymbols = 250u;
 
     enum State {kWaitBook, kWaitPages, kWaitRetell};
     State state_;

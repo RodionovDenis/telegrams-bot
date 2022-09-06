@@ -142,7 +142,7 @@ std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t cha
 
 std::string GetReference(int64_t id, const std::optional<std::string>& user) {
     if (user) {
-        return fmt::format("[{}](tg://user?id={})", id, *user);
+        return fmt::format("[{}](tg://user?id={})", *user, id);
     }
     return fmt::format("tg://user?id={}", id);
 }

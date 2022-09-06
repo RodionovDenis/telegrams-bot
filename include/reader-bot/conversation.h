@@ -1,6 +1,7 @@
 #pragma once 
 
 #include <memory>
+#include <string>
 
 #include "api.h"
 #include "storage.h"
@@ -9,6 +10,7 @@ class IConversation {
 public:
     virtual ~IConversation() = default;
     virtual void Handle(const std::string& message) = 0;
+    virtual std::string What() = 0;
     bool IsFinish() const {
         return is_finish_;
     }
@@ -18,3 +20,4 @@ protected:
 
 std::unique_ptr<IConversation> CreateConversation(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, 
                                                   const std::string& command);
+nlohmann::json RemoveButtons();

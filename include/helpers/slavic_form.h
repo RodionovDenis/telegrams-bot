@@ -27,7 +27,7 @@ inline std::string GetSlavicHours(int n) {
 }
 
 inline std::string GetSlavicPages(int n) {
-    static constexpr std::array pages = {"страниц", "страницу", "страницы"};
+    static constexpr std::array pages = {"страниц", "страница", "страницы"};
     return fmt::format("{} {}", n, pages[GetSlavicForm(n)]);
 }
 
@@ -37,6 +37,11 @@ inline std::string GetSlavicRounds(int n) {
 }
 
 inline std::string GetSlavicBook(int n) {
-    static constexpr std::array books = {"книг", "книги", "книги"};
+    static constexpr std::array books = {"книг", "книга", "книги"};
     return fmt::format("{} {}", n, books[GetSlavicForm(n)]);
+}
+
+inline std::string GetSlavicSymbols(int n) {
+    static constexpr std::array symbols = {"символов", "символ", "символа"};
+    return fmt::format("{} {}", n, symbols[GetSlavicForm(n)]);
 }

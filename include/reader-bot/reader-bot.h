@@ -37,16 +37,20 @@ private:
 
     void HandleCancel(int64_t id);
     std::unordered_set<std::string> hard_commands_ 
-        = {"/add_session", "add_book", "delete_book"};
+        = {"/add_session", "/add_book", "/delete_book"};
 
     void ThreadUpdateSeries();
     void ThreadReminder();
     void SaveConfig();
     void SendReminder(int64_t id) const;
-    void UpdateSeries();
-    auto GetSortPatricipants();
-    void SendStatictics(auto&& sort_vector, const std::string& interval);
 
+    void UpdateSeries();
+    void SendTopPageSeries();
+    void SendTopShockSeries();
+    void SendTopAllPages();
+
+    const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
+    const int64_t channel_id_ = -1001481144373;
     std::unique_ptr<IApiTelegram> api_;
 
     FileConfigReader config_;
@@ -56,8 +60,6 @@ private:
     std::thread update_thread_;
     std::thread reminder_thread_;
 
-    const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
-    const int64_t channel_id_ = -1001481144373;
     const std::string config_name_ = "reader.json";
     const std::string read_me_path_ = "../src/reader-bot/read_me.txt";
 };

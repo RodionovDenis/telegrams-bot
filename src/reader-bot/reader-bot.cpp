@@ -58,7 +58,7 @@ void ReaderBot::SendPages() {
     std::string message = "Рейтинг участников по количеству прочитанных страниц в текущем раунде.\n\n";
     for (const auto& [id, pages]: v) {
         message += fmt::format("{}. {} – {}.\n", ++count, GetReference(id, config_.users.at(id).username),
-            GetSlavicPages(pages));
+            GetSlavicPages(Case::kNominative, pages));
     }
     if (count) {
         api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
@@ -91,10 +91,10 @@ void ReaderBot::SendRounds() {
     for (const auto& [id, is_series, rounds]: v) {
         if (is_series) {
             save.first += fmt::format("{}. {} – теперь твой ударный режим {}.\n", ++save.second,
-                GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
+                GetReference(id, config_.users.at(id).username), GetSlavicRounds(Case::kNominative, rounds));
         } else if (rounds) {
             lost.first += fmt::format("{}. {} – твой ударный режим ({}) сгорел.\n", ++lost.second,
-            GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
+            GetReference(id, config_.users.at(id).username), GetSlavicRounds(Case::kNominative, rounds));
         }
     }
     if (save.second) {
@@ -119,7 +119,7 @@ void ReaderBot::SendAllPages() {
     std::string message = "Рейтинг участников по количеству прочитанных страниц за всё время.\n\n";
     for (const auto& [id, pages]: v) {
         message += fmt::format("{}. {} – {}.\n", ++count, GetReference(id, config_.users.at(id).username), 
-            GetSlavicPages(pages));
+            GetSlavicPages(Case::kNominative, pages));
     }
     api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
 }
@@ -128,8 +128,8 @@ void ReaderBot::SendReminder(int64_t id) const {
     auto& series = config_.users.at(id).series;
     api_->SendMessage(id, fmt::format("До завершения текущего раунда чтения осталось 9 часов. "
         "Чтобы продлить ваш ударный режим до {}, вам необходимо прочитать ещё {}.\n\n"
-        "Поторопитесь!", GetSlavicRounds(series->rounds + 1),
-        GetSlavicPages(ShockSeries::kLimitPages - series->pages)));
+        "Поторопитесь!", GetSlavicRounds(Case::kGenitive, series->rounds + 1),
+        GetSlavicPages(Case::kAccusative, ShockSeries::kLimitPages - series->pages)));
 }
 
 void ReaderBot::ThreadReminder() {
@@ -173,7 +173,7 @@ void ReaderBot::ThreadUpdateSeries() {
         }
     };
     while (true) {
-        std::this_thread::sleep_until(kUntil());
+        std::this_thread::sleep_until(kUntil() - std::chrono::seconds{2});
         std::lock_guard guard(mutex_);
         auto weekday = std::get<2>(GetTimeDaysWeek());
         if (weekday == std::chrono::Thursday) {

@@ -3,7 +3,7 @@
 #include <string>
 #include <fmt/format.h>
 
-enum class Case { kNominative, kGenitive, kAccusative, kDative, kInstrumental, kPrepositional };
+enum class Case { kNominative, kGenitive, kDative, kAccusative, kInstrumental, kPrepositional };
 
 constexpr auto GetSlavicForm(int number) {
     if ((number % 100 >= 5 && number % 100 <= 20) ||

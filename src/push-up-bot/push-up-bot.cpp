@@ -23,7 +23,7 @@ void PushUpBot::ShowStats() {
     for (auto i = 0u; i < v.size(); ++i) {
         stats_message += fmt::format("{}. {} — {} ударного режима (с {}).\n", i + 1,
             GetReference(v[i].first, admins_[v[i].first]),
-            GetSlavicDays(Case::kInstrumental, v[i].second.days),
+            GetSlavicDays(Case::kNominative, v[i].second.days),
             v[i].second.start_date);
     }
     api_->SendMessage(channel_id_, stats_message);
@@ -31,7 +31,7 @@ void PushUpBot::ShowStats() {
 
 std::optional<std::string> PushUpBot::GetReminderMessage() {
     std::string message = fmt::format("До сгорания ударных режимов ровно {}.\n\n",
-                                        GetSlavicHours(Case::kInstrumental, 24 - time_.GetCurrentTime().hours));
+                                        GetSlavicHours(Case::kNominative, 24 - time_.GetCurrentTime().hours));
     bool is_empty = true;
     std::vector<std::pair<int64_t, InfoContext>> v = {config_.stats.begin(), config_.stats.end()};
     std::sort(v.begin(), v.end(), [](const auto& l1, const auto& l2) {
@@ -41,7 +41,7 @@ std::optional<std::string> PushUpBot::GetReminderMessage() {
         if (time_.DiffDays(time_.GetUnixTime(), person.second.last_activity)) {
             auto username = admins_.at(person.first);
             message += fmt::format("{} — {}.\n", GetReference(person.first, username),
-                                        GetSlavicDays(Case::kInstrumental, person.second.days));
+                                        GetSlavicDays(Case::kNominative, person.second.days));
             is_empty = false;
         }
     }

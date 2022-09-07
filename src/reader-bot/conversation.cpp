@@ -11,7 +11,7 @@ public:
         if (user_.books.size() == kLimitBooks) {
             api_.SendMessage(id_, fmt::format("На данный момент действует ограничение – "
                 "у вас может быть не больше {}. Воспользуйтесь удалением, затем повторите попытку.", 
-                GetSlavicBook(kLimitBooks)));
+                GetSlavicBooks(Case::kGenitive, kLimitBooks)));
             is_finish_ = true;
         } else {
             api_.SendMessage(id_, "Введите автора книги.");
@@ -178,7 +178,7 @@ private:
         state_ = kWaitRetell;
         api_->SendMessage(id_, fmt::format("Принято. Переходим к пересказу.\n\n"
         "Единственное ограничение на пересказ – не менее *{}* (в среднем, это 2-4 предложения).\n\n"
-        "Введите текст.", GetSlavicSymbols(kLimitSymbols)), ParseMode::kMarkdown);
+        "Введите текст.", GetSlavicSymbols(Case::kGenitive, kLimitSymbols)), ParseMode::kMarkdown);
     } catch (const std::logic_error&) {
             api_->SendMessage(id_, "Некорректный ввод страниц.");
     }
@@ -187,21 +187,21 @@ private:
         auto pages = user_->series->pages; 
         if (pages < ShockSeries::kLimitPages) {
             return fmt::format("\n\nЧтобы остаться в ударном режиме, вам необходимо прочитать еще {} "
-                "в текущем раунде.", GetSlavicPages(ShockSeries::kLimitPages - pages));
+                "в текущем раунде.", GetSlavicPages(Case::kGenitive, ShockSeries::kLimitPages - pages));
         } else if (pages > ShockSeries::kLimitPages) {
             return fmt::format("\n\nВ текущем раунде вы прочитали на {} больше минимума.\n\n"
                 "Вы остаетесь в ударном режиме.", 
-                GetSlavicPages(pages - ShockSeries::kLimitPages));
+                GetSlavicPages(Case::kAccusative, pages - ShockSeries::kLimitPages));
         }
         return fmt::format("\n\nВ текущем раунде вы прочитали {}.\n\nВы остаетесь в ударном режиме.", 
-                GetSlavicPages(ShockSeries::kLimitPages));
+                GetSlavicPages(Case::kAccusative, ShockSeries::kLimitPages));
     }
 
     void SendRetellMessage() {
         auto url = GetReference(id_);
         auto text_link = AddTextLink(0, GetLengthUtf16(user_->username), url);
         auto message = fmt::format("{} прочитал(а) {}.\n\nАвтор книги: {}\nНазвание книги: {}\n\nКраткий пересказ: ", 
-                                    user_->username, GetSlavicPages(pages_), book_.author, book_.name);
+                                    user_->username, GetSlavicPages(Case::kAccusative, pages_), book_.author, book_.name);
         auto spoiler = AddSpoiler(GetLengthUtf16(message), GetLengthUtf16(retell_));
         message += retell_;
         api_->SendMessage(channel_id_, message, ParseMode::kNone, nlohmann::json{}, {text_link, spoiler});
@@ -211,7 +211,7 @@ private:
         auto length = GetLengthUtf8(message);
         if (length < kLimitSymbols) {
             api_->SendMessage(id_, fmt::format("Пересказ не засчитан. У него на {} меньше минимума.\n\n"
-            "Повторите попытку.", GetSlavicSymbols(kLimitSymbols - length)));
+            "Повторите попытку.", GetSlavicSymbols(Case::kAccusative, kLimitSymbols - length)));
             return;
         }
         retell_ = std::move(message);
@@ -222,7 +222,7 @@ private:
             series = ShockSeries{.rounds = 0, .pages = pages_};
         }
         user_->all_pages += pages_;
-        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ваш сеанс добавлен. {}", GetSlavicPages(pages_), 
+        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ваш сеанс добавлен. {}", GetSlavicPages(Case::kAccusative, pages_), 
             GetAddSessionFinish()));
         SendRetellMessage();
         is_finish_ = true;

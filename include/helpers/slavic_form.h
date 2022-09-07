@@ -3,7 +3,9 @@
 #include <string>
 #include <fmt/format.h>
 
-inline int GetSlavicForm(int number) {
+enum class Case { kNominative, kGenitive, kAccusative, kDative, kInstrumental, kPrepositional };
+
+constexpr auto GetSlavicForm(int number) {
     if ((number % 100 >= 5 && number % 100 <= 20) ||
         (number % 10 >= 5 && number % 10 <= 9) || number % 10 == 0) {
         return 0;
@@ -16,32 +18,62 @@ inline int GetSlavicForm(int number) {
     }
 }
 
-inline std::string GetSlavicDays(int n) {
-    static constexpr std::array days = {"дней", "день", "дня"};
-    return fmt::format("{} {}", n,  days[GetSlavicForm(n)]);
+constexpr auto SlavicGenerate(const std::array<const char*, 18>& words) {
+    return [words](Case c, int n) {
+        return fmt::format("{} {}", n, words[3 * static_cast<int>(c) + GetSlavicForm(n)]);
+    };
 }
 
-inline std::string GetSlavicHours(int n) {
-    static constexpr std::array hours = {"часов", "час", "часа"};
-    return fmt::format("{} {}", n,  hours[GetSlavicForm(n)]);
-}
+constexpr auto GetSlavicDays = SlavicGenerate({
+    "дней", "день", "дня",
+    "дней", "дня", "дней", 
+    "дней", "дню", "дням",
+    "дней", "день", "дня",
+    "дней", "днём", "днями",
+    "дней", "дне", "днях"
+});
 
-inline std::string GetSlavicPages(int n) {
-    static constexpr std::array pages = {"страниц", "страница", "страницы"};
-    return fmt::format("{} {}", n, pages[GetSlavicForm(n)]);
-}
+constexpr auto GetSlavicHours = SlavicGenerate({
+    "часов", "час", "часа",
+    "часов", "часа", "часов", 
+    "часов", "часу", "часам",
+    "часов", "час", "часа",
+    "часов", "часом", "часами",
+    "часов", "часе", "часах"
+});
 
-inline std::string GetSlavicRounds(int n) {
-    static constexpr std::array rounds = {"раундов", "раунд", "раунда"};
-    return fmt::format("{} {}", n, rounds[GetSlavicForm(n)]);
-}
+constexpr auto GetSlavicPages = SlavicGenerate({
+    "страниц", "страница", "страницы",
+    "страниц", "страницы", "страниц",
+    "страниц", "странице", "страницам",
+    "страниц", "страницу", "страницы",
+    "страниц", "страницей", "страницами",
+    "страниц", "странице", "страницах"
+});
 
-inline std::string GetSlavicBook(int n) {
-    static constexpr std::array books = {"книг", "книга", "книги"};
-    return fmt::format("{} {}", n, books[GetSlavicForm(n)]);
-}
+constexpr auto GetSlavicRounds = SlavicGenerate({
+    "раундов", "раунд", "раунда",
+    "раундов", "раунда", "раундов",
+    "раундов", "раунду", "раундам",
+    "раундов", "раунд", "раунда",
+    "раундов", "раундом", "раундами",
+    "раундов", "раунде", "раундах"
+});
 
-inline std::string GetSlavicSymbols(int n) {
-    static constexpr std::array symbols = {"символов", "символ", "символа"};
-    return fmt::format("{} {}", n, symbols[GetSlavicForm(n)]);
-}
+constexpr auto GetSlavicBooks = SlavicGenerate({
+    "книг", "книга", "книги",
+    "книг", "книги", "книг",
+    "книг", "книге", "книгам",
+    "книг", "книгу", "книги",
+    "книг", "книгой", "книгами",
+    "книг", "книге", "книгах"
+});
+
+constexpr auto GetSlavicSymbols = SlavicGenerate({
+    "символов", "символ", "символа",
+    "символов", "символа", "символов",
+    "символов", "символу", "символам",
+    "символов", "символ", "символа",
+    "символов", "символом", "символами",
+    "символов", "символе", "символах"
+});

@@ -9,18 +9,16 @@ find_package(Poco REQUIRED Data Net)
 
 include_directories(include lib include/push-up-bot include/reader-bot)
 
-add_library(PushUpBot src/push-up-bot/push-up-bot.cpp)
-add_library(ReaderBot src/reader-bot/reader-bot.cpp)
 add_library(Conversation src/reader-bot/conversation.cpp)
 add_library(Api src/api.cpp)
 add_library(Clock src/clock.cpp)
 
-add_executable(Bots src/main.cpp)
+add_executable(PushUpBot src/push-up-bot/main.cpp src/push-up-bot/push-up-bot.cpp)
+add_executable(ReaderBot src/reader-bot/main.cpp src/reader-bot/reader-bot.cpp)
 
 target_link_libraries(Api PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON fmt)
 target_link_libraries(Conversation PUBLIC fmt)
-target_link_libraries(Clock PRIVATE fmt)
-target_link_libraries(PushUpBot PRIVATE fmt pthread)
-target_link_libraries(ReaderBot PRIVATE Conversation pthread)
+target_link_libraries(Clock PUBLIC fmt)
 
-target_link_libraries(Bots PushUpBot ReaderBot Api Clock)
+target_link_libraries(PushUpBot PRIVATE Api Clock pthread)
+target_link_libraries(ReaderBot PRIVATE Api Conversation pthread)

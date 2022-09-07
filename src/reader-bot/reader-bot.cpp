@@ -73,7 +73,7 @@ void ReaderBot::SendRounds() {
     };
     static constexpr auto kTransform = [](auto& pair) {
         auto& series = pair.second.series;
-        uint32_t rounds; 
+        uint32_t rounds;
         if (series->pages < ShockSeries::kLimitPages) {
             rounds = series->rounds;
             series = std::nullopt;
@@ -90,10 +90,10 @@ void ReaderBot::SendRounds() {
     auto lost = std::make_pair(std::string("Участники, *потерявшие* свой ударный режим. \n\n"), 0);
     for (const auto& [id, is_series, rounds]: v) {
         if (is_series) {
-            save.first += fmt::format("{}. {} – теперь твой ударный режим {}.\n", ++save.second, 
+            save.first += fmt::format("{}. {} – теперь твой ударный режим {}.\n", ++save.second,
                 GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
         } else if (rounds) {
-            lost.first += fmt::format("{}. {} – твой ударный режим ({}) сгорел.\n", ++lost.second, 
+            lost.first += fmt::format("{}. {} – твой ударный режим ({}) сгорел.\n", ++lost.second,
             GetReference(id, config_.users.at(id).username), GetSlavicRounds(rounds));
         }
     }
@@ -127,8 +127,9 @@ void ReaderBot::SendAllPages() {
 void ReaderBot::SendReminder(int64_t id) const {
     auto& series = config_.users.at(id).series;
     api_->SendMessage(id, fmt::format("До завершения текущего раунда чтения осталось 9 часов. "
-        "Чтобы продлить ваш ударный режим до {}, вам необходимо прочитать ещё {}. "
-        "Поторопитесь!", GetSlavicRounds(series->rounds), GetSlavicPages(series->pages)));
+        "Чтобы продлить ваш ударный режим до {}, вам необходимо прочитать ещё {}.\n\n"
+        "Поторопитесь!", GetSlavicRounds(series->rounds + 1),
+        GetSlavicPages(ShockSeries::kLimitPages - series->pages)));
 }
 
 void ReaderBot::ThreadReminder() {
@@ -136,8 +137,7 @@ void ReaderBot::ThreadReminder() {
         const auto& [time, days, weekday] = GetTimeDaysWeek();
         if ((weekday == std::chrono::Sunday && time.hours().count() >= 15) || 
             (weekday == std::chrono::Wednesday && time.hours().count() < 15) ||
-             weekday == std::chrono::Monday || weekday == std::chrono::Tuesday) {
-
+            (weekday == std::chrono::Monday) || (weekday == std::chrono::Tuesday)) {
             return days + (std::chrono::Wednesday - weekday) + std::chrono::hours{15};
         }
         return days + (std::chrono::Sunday - weekday) + std::chrono::hours{15};
@@ -146,7 +146,8 @@ void ReaderBot::ThreadReminder() {
         std::this_thread::sleep_until(kUntil());
         std::lock_guard guard(mutex_);
         for (const auto& user: config_.users) {
-            if (user.second.series && user.second.series->pages < ShockSeries::kLimitPages) {
+            auto& series = user.second.series;
+            if (series && series->rounds && series->pages < ShockSeries::kLimitPages) {
                 SendReminder(user.first);
             }
         }
@@ -155,15 +156,14 @@ void ReaderBot::ThreadReminder() {
 
 void ReaderBot::ThreadUpdateSeries() {
     static constexpr auto kUntil = []() {
-        // const auto& [time, days, weekday] = GetTimeDaysWeek();
-        // if (weekday == std::chrono::Monday || weekday == std::chrono::Tuesday || weekday == std::chrono::Wednesday) {
-        //     return days + (std::chrono::Wednesday - weekday) + std::chrono::days{1};
-        // } else if (weekday == std::chrono::Thursday) {
-        //     return days + std::chrono::days{1};
-        // } else {
-        //     return days + (std::chrono::Sunday - weekday) + std::chrono::days{1};
-        // }
-        return std::chrono::minutes{1};
+        const auto& [time, days, weekday] = GetTimeDaysWeek();
+        if (weekday == std::chrono::Monday || weekday == std::chrono::Tuesday || weekday == std::chrono::Wednesday) {
+            return days + (std::chrono::Wednesday - weekday) + std::chrono::days{1};
+        } else if (weekday == std::chrono::Thursday) {
+            return days + std::chrono::days{1};
+        } else {
+            return days + (std::chrono::Sunday - weekday) + std::chrono::days{1};
+        }
     };
     static constexpr auto kGetInterval = [](std::chrono::weekday day) {
         if (day == std::chrono::Monday || day == std::chrono::Wednesday) {
@@ -173,7 +173,7 @@ void ReaderBot::ThreadUpdateSeries() {
         }
     };
     while (true) {
-        std::this_thread::sleep_for(kUntil());
+        std::this_thread::sleep_until(kUntil());
         std::lock_guard guard(mutex_);
         auto weekday = std::get<2>(GetTimeDaysWeek());
         if (weekday == std::chrono::Thursday) {

@@ -1,6 +1,6 @@
 #include "reader-bot.h"
 #include "nlohmann/json.hpp"
-#include "helpers/json_helper.h"
+#include "json_helper.h"
 #include "fmt/format.h"
 #include "helpers/slavic_form.h"
 #include <fstream>
@@ -181,12 +181,18 @@ void ReaderBot::ThreadUpdateSeries() {
             api_->SendMessage(channel_id_, "*Начало интервала пятница – воскресенье.*", ParseMode::kMarkdown);
             break;
         }
+        std::erase_if(current_convers_, [this](const auto& pair) {
+            api_->SendMessage(pair.first, fmt::format("Команда {} автоматически отменена.", pair.second->What()));
+            return true;
+        });
         SendPages();
         SendRounds();
         SendAllPages();
         api_->SendMessage(channel_id_, fmt::format("*Завершение интервала {}.*", kGetInterval(weekday)), ParseMode::kMarkdown);
         std::this_thread::sleep_for(std::chrono::seconds(2));
-        api_->SendMessage(channel_id_, fmt::format("*Начало интервала {}.*", kGetInterval(++weekday)), ParseMode::kMarkdown); 
+        if (weekday != std::chrono::Wednesday) {
+            api_->SendMessage(channel_id_, fmt::format("*Начало интервала {}.*", kGetInterval(++weekday)), ParseMode::kMarkdown);
+        }
         SaveConfig();
     }
 }
@@ -195,7 +201,9 @@ void ReaderBot::HandleNotConversation(int64_t id, const std::string& message) {
     if (auto it = simple_commands_.find(message); it != simple_commands_.end()) {
         (this->*it->second)(id);
     } else if (hard_commands_.contains(message)) {
-        auto conv = CreateConversation(id, channel_id_, api_.get(), &config_.users.at(id), message);
+        auto weekday = std::get<2>(GetTimeDaysWeek());
+        auto conv = CreateConversation(id, channel_id_, api_.get(), &config_.users.at(id), 
+            message, weekday);
         if (!conv->IsFinish()) {
             current_convers_.emplace(id, std::move(conv));
         }

@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "helpers/json_helper.h"
+#include "json_helper.h"
 #include "fmt/format.h"
 #include "nlohmann/json.hpp"
 #include "helpers/slavic_form.h"

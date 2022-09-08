@@ -137,9 +137,14 @@ private:
 
 class AddSession: public IConversation {
 public:
-    AddSession(int64_t id, int64_t channel_id, IApiTelegram* api, User* user) 
+    AddSession(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, std::chrono::weekday day) 
     : id_(id), channel_id_(channel_id), api_(api), user_(user) {
-        if (user_->books.empty()) {
+        if (day == std::chrono::Thursday) {
+            api_->SendMessage(id_, "Сегодня четверг – выходной день." 
+                "Пользоваться командой /add_session запрещено.");
+            is_finish_ = true;
+        }
+        else if (user_->books.empty()) {
             api_->SendMessage(id_, "Чтобы добавить сеанс, у вас должна быть хотя бы одна книга. " 
                 "Добавьте книгу и повторите попытку.");
             is_finish_ = true;
@@ -244,13 +249,13 @@ private:
 };
 
 std::unique_ptr<IConversation> CreateConversation(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, 
-                                                  const std::string& command) {
+                                                  const std::string& command, std::chrono::weekday day) {
         if (command == "/add_book") {
             return std::make_unique<AddBook>(id, api, user);
         } else if (command == "/delete_book") {
             return std::make_unique<DeleteBook>(id, api, user);
         } else if (command == "/add_session") {
-            return std::make_unique<AddSession>(id, channel_id, api, user);
+            return std::make_unique<AddSession>(id, channel_id, api, user, day);
         } 
         throw std::runtime_error("Hard command is not found");
     }

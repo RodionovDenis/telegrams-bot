@@ -19,5 +19,5 @@ protected:
 };
 
 std::unique_ptr<IConversation> CreateConversation(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, 
-                                                  const std::string& command);
+                                                  const std::string& command, std::chrono::weekday day);
 nlohmann::json RemoveButtons();

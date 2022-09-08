@@ -8,7 +8,7 @@
 #include "storage.h"
 #include "conversation.h"
 
-struct FileConfigReader {
+struct FileConfig {
     uint64_t offset = 0;
     std::unordered_map<int64_t, User> users;
 };
@@ -34,8 +34,6 @@ private:
         = {{"/start", &ReaderBot::SendStart},
            {"/info", &ReaderBot::SendInfo},
            {"/my_books", &ReaderBot::SendListBooks}};
-
-    void HandleCancel(int64_t id);
     std::unordered_set<std::string> hard_commands_ 
         = {"/add_session", "/add_book", "/delete_book"};
 
@@ -52,7 +50,7 @@ private:
     const int64_t channel_id_ = -1001481144373;
     std::unique_ptr<IApiTelegram> api_;
 
-    FileConfigReader config_;
+    FileConfig config_;
     CurrentTime time_; 
 
     std::mutex mutex_;

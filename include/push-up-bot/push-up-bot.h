@@ -16,7 +16,7 @@ struct InfoContext {
     std::string start_date;
 };
 
-struct FileConfigPushUp {
+struct FileConfig {
     uint64_t offset = 0;
     std::unordered_map<int64_t, InfoContext> stats;
 };
@@ -42,7 +42,7 @@ private:
     CurrentTime time_;
     
     std::unordered_map<int64_t, std::string> admins_;
-    FileConfigPushUp config_;
+    FileConfig config_;
     const std::string config_name_ = "../config/config.json";
 
     std::thread remainder_thread_;

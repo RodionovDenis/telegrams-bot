@@ -30,9 +30,11 @@ private:
     void SendStart(int64_t id) const;
     void SendInfo(int64_t id) const;
     void SendListBooks(int64_t id) const;
+    void SendRules(int64_t id) const;
     const std::unordered_map<std::string, void (ReaderBot::*)(int64_t) const> simple_commands_
         = {{"/start", &ReaderBot::SendStart},
            {"/info", &ReaderBot::SendInfo},
+           {"/rules", &ReaderBot::SendRules},
            {"/my_books", &ReaderBot::SendListBooks}};
     std::unordered_set<std::string> hard_commands_ 
         = {"/add_session", "/add_book", "/delete_book"};
@@ -58,5 +60,6 @@ private:
     std::thread reminder_thread_;
 
     const std::string config_name_ = "reader.json";
-    const std::string read_me_path_ = "../src/reader-bot/read_me.txt";
+    const std::string info_path_ = "../src/reader-bot/info.txt";
+    const std::string rules_path_ = "../src/reader-bot/rules.txt";
 };

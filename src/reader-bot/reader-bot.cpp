@@ -253,13 +253,17 @@ void ReaderBot::SendStart(int64_t id) const {
 }
 
 void ReaderBot::SendInfo(int64_t id) const {
-    std::ifstream file(read_me_path_);
+    std::ifstream file(info_path_);
     if (!file.is_open()) {
         throw std::runtime_error("Read me file is not open");
     }
     std::ostringstream stream;
     stream << file.rdbuf();
     api_->SendMessage(id, stream.str(), ParseMode::kMarkdown);
+}
+
+void ReaderBot::SendRules(int64_t id) const {
+    // you must add rules
 }
 
 void ReaderBot::SendListBooks(int64_t id) const {

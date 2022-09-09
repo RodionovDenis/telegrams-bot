@@ -111,7 +111,7 @@ public:
             api_->SendMessage(id_, "Нечего удалять, у вас нет книг.");
             is_finish_ = true;
         } else {
-            api_->SendMessage(id_, "Выберите книгу, которую хотите удалить.", ParseMode::kNone,
+            api_->SendMessage(id_, "Выберите из списка книгу, которую хотите удалить.", ParseMode::kNone,
                 GetButtonsBooks(user_->books));
         }
     }
@@ -149,7 +149,7 @@ public:
                 "Добавьте книгу и повторите попытку.");
             is_finish_ = true;
         } else {
-            api_->SendMessage(id_, "Выберите книгу, которую читали.", ParseMode::kNone, 
+            api_->SendMessage(id_, "Выберите из списка книгу, которую читали.", ParseMode::kNone, 
             GetButtonsBooks(user_->books));
             state_ = kWaitBook;
             handles_ = {{kWaitBook, &AddSession::HandleBook}, 

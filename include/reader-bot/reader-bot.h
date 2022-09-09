@@ -41,6 +41,7 @@ private:
 
     void ThreadUpdateSeries();
     void ThreadReminder();
+    static constexpr auto kReminderHour = 15; 
     void SaveConfig();
     void SendReminder(int64_t id) const;
 
@@ -50,6 +51,7 @@ private:
 
     const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
     const int64_t channel_id_ = -1001481144373;
+    const std::string channel_link_ = "https://t.me/+63V1t5gCMTViNjZi";
     std::unique_ptr<IApiTelegram> api_;
 
     FileConfig config_;
@@ -60,6 +62,4 @@ private:
     std::thread reminder_thread_;
 
     const std::string config_name_ = "reader.json";
-    const std::string info_path_ = "../src/reader-bot/info.txt";
-    const std::string rules_path_ = "../src/reader-bot/rules.txt";
 };

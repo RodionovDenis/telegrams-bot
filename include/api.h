@@ -39,5 +39,6 @@ public:
 
 std::unique_ptr<IApiTelegram> CreateApi(const std::string& endpoint, int64_t channel_id);
 std::string GetReference(int64_t id, const std::optional<std::string>& user = std::nullopt);
+std::string GetLink(const std::string& name, const std::string& link);
 nlohmann::json AddSpoiler(uint32_t offset, uint32_t length);
 nlohmann::json AddTextLink(uint32_t offset, uint32_t length, const std::string& url);

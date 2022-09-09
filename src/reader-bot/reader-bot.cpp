@@ -8,6 +8,37 @@
 #include <codecvt>
 #include <locale>
 
+static constexpr const char* info = "*Прежде, чем общаться со мной, прочитай подробное описание моих команд!*\n\n"
+    "1. *add_book* – добавлю тебе новую книгу (действует ограничение, ты можешь добавить не более {}).\n"
+    "2. *my_books* – покажу текущий список твоих книг.\n"
+    "3. *delete_book* – удалю любую книгу из твоего списка.\n"
+    "4. *add_session* – зарегистрирую сеанс прочтения (тебе нужно будет выбрать книгу, указать " 
+        "страницы и написать пересказ) и опубликую его в общий канал.\n"
+    "5. *cancel* – отменю любой запрос, если что-то пошло не так (обращаю внимание, что удаление "
+        "сообщения не поможет, нужно воспользоваться этой командой).\n"
+    "6. *rules* – покажу наши правила (когда читать и по сколько страниц) – обязательно к ознакомлению.\n"
+    "7. *info* – ещё раз покажу описание команд.\n\n"
+    "Все эти команды доступны тебе в \"меню\".\n\n"
+    "{} с публикациями, подпишитесь.\n\n"
+    "По всем вопросам, предложениям, улучшениям, неполадкам пиши {}.";
+
+static constexpr const char* rules = "*Наши правила: *\n\n"
+    "Читаем каждую неделю *двумя раундами*.\n\n"
+        "*Раундом* называем следующие временные отрезки:\n\n"
+    "1. с *понедельника* 00:00 до *среды* 23:59.\n"
+    "2. с *пятницы* 00:00 до *воскресенья* 23:59.\n\n"
+    "В каждый раунд тебе нужно прочитать минимум *{}*, но можно и больше. "
+    "Соответственно, в неделю нужно читать минимум *{}*. "
+    "Первая половина должна быть прочитана в *раунде №1*, вторая половина – в *раунде №2*.\n\n"
+    "*Четверг* – выходной день. Все мои команды будут доступны за исключением *add_session*. " 
+        "В этот день ей пользоваться нельзя.\n\n"
+    "В преддверии завершения очередного раунда в {} я буду отправлять следующую статистику:\n\n"
+    "1. топ участников по количеству прочитанных страниц в этом раунде.\n"
+    "2. топ учаcтников по ударному режиму (сколько раундов *подряд (!)* ты читаешь больше минимума).\n"
+    "3. топ участников по количеству прочитанных страниц за всё время.\n\n"
+    "Каждый раунд, за *{}* до его завершения, я буду напоминать тебе о чтении, "
+        "если у тебя прочитано менее *{}*.";
+
 auto GetTimeDaysWeek() {
     auto now = std::chrono::system_clock::now() + std::chrono::hours{3};
     auto days = std::chrono::floor<std::chrono::days>(now);
@@ -135,12 +166,12 @@ void ReaderBot::SendReminder(int64_t id) const {
 void ReaderBot::ThreadReminder() {
     static constexpr auto kUntil = []() {
         const auto& [time, days, weekday] = GetTimeDaysWeek();
-        if ((weekday == std::chrono::Sunday && time.hours().count() >= 15) || 
-            (weekday == std::chrono::Wednesday && time.hours().count() < 15) ||
+        if ((weekday == std::chrono::Sunday && time.hours().count() >= kReminderHour) || 
+            (weekday == std::chrono::Wednesday && time.hours().count() < kReminderHour) ||
             (weekday == std::chrono::Monday) || (weekday == std::chrono::Tuesday)) {
-            return days + (std::chrono::Wednesday - weekday) + std::chrono::hours{15};
+            return days + (std::chrono::Wednesday - weekday) + std::chrono::hours{kReminderHour};
         }
-        return days + (std::chrono::Sunday - weekday) + std::chrono::hours{15};
+        return days + (std::chrono::Sunday - weekday) + std::chrono::hours{kReminderHour};
     };
     while (true) {
         std::this_thread::sleep_until(kUntil());
@@ -178,7 +209,7 @@ void ReaderBot::ThreadUpdateSeries() {
         auto weekday = std::get<2>(GetTimeDaysWeek());
         if (weekday == std::chrono::Thursday) {
             std::this_thread::sleep_for(std::chrono::seconds{2});
-            api_->SendMessage(channel_id_, "*Начало интервала пятница – воскресенье.*", ParseMode::kMarkdown);
+            api_->SendMessage(channel_id_, "*Начало раунда пятница – воскресенье.*", ParseMode::kMarkdown);
             break;
         }
         std::erase_if(current_convers_, [this](const auto& pair) {
@@ -188,10 +219,10 @@ void ReaderBot::ThreadUpdateSeries() {
         SendPages();
         SendRounds();
         SendAllPages();
-        api_->SendMessage(channel_id_, fmt::format("*Завершение интервала {}.*", kGetInterval(weekday)), ParseMode::kMarkdown);
+        api_->SendMessage(channel_id_, fmt::format("*Завершение раунда {}.*", kGetInterval(weekday)), ParseMode::kMarkdown);
         std::this_thread::sleep_for(std::chrono::seconds(2));
         if (weekday != std::chrono::Wednesday) {
-            api_->SendMessage(channel_id_, fmt::format("*Начало интервала {}.*", kGetInterval(++weekday)), ParseMode::kMarkdown);
+            api_->SendMessage(channel_id_, fmt::format("*Начало раунда {}.*", kGetInterval(++weekday)), ParseMode::kMarkdown);
         }
         SaveConfig();
     }
@@ -246,24 +277,24 @@ void ReaderBot::HandleRequest(const RequestBot& request) {
     SaveConfig();
 }
 
+
 void ReaderBot::SendStart(int64_t id) const {
     api_->SendMessage(id, fmt::format("Привет, {}!\n\nТы стал участником нашего марафона по чтению!\n\n"
-                                    "Для получения подробной информации о том, как мной пользоваться "
+                                    "Для получения подробной информации о поддерживаемых командах "
                                     "нажми /info.", config_.users.at(id).username));
 }
 
 void ReaderBot::SendInfo(int64_t id) const {
-    std::ifstream file(info_path_);
-    if (!file.is_open()) {
-        throw std::runtime_error("Read me file is not open");
-    }
-    std::ostringstream stream;
-    stream << file.rdbuf();
-    api_->SendMessage(id, stream.str(), ParseMode::kMarkdown);
+    api_->SendMessage(id, fmt::format(info, GetSlavicBooks(Case::kGenitive, Book::kLimitBooks),
+        GetLink("Общий канал", channel_link_), GetReference(957596074, "ему")), ParseMode::kMarkdown);
 }
 
 void ReaderBot::SendRules(int64_t id) const {
-    // you must add rules
+    api_->SendMessage(id, fmt::format(rules, GetSlavicPages(Case::kDative, ShockSeries::kLimitPages),
+        GetSlavicPages(Case::kDative, 2 * ShockSeries::kLimitPages),
+        GetLink("общий канал", channel_link_),
+        GetSlavicHours(Case::kNominative, 24 - kReminderHour), 
+        GetSlavicPages(Case::kGenitive, ShockSeries::kLimitPages)), ParseMode::kMarkdown);
 }
 
 void ReaderBot::SendListBooks(int64_t id) const {

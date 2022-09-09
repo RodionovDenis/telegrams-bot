@@ -147,6 +147,10 @@ std::string GetReference(int64_t id, const std::optional<std::string>& user) {
     return fmt::format("tg://user?id={}", id);
 }
 
+std::string GetLink(const std::string& name, const std::string& link) {
+    return fmt::format("[{}]({})", name, link);
+}
+
 nlohmann::json AddSpoiler(uint32_t offset, uint32_t length) {
     return  {{"type", "spoiler"}, 
             {"offset", offset}, 

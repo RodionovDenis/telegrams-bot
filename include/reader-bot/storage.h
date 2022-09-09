@@ -5,6 +5,7 @@
 #include <optional>
 
 struct Book {
+    static constexpr auto kLimitBooks = 5;
     std::string author;
     std::string name;
     bool operator==(const Book& rhs) const {

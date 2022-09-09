@@ -8,10 +8,10 @@
 class AddBook: public IConversation {
 public:
     AddBook(int64_t id, IApiTelegram* api, User* user) : id_(id), api_(*api), user_(*user) {
-        if (user_.books.size() == kLimitBooks) {
+        if (user_.books.size() == Book::kLimitBooks) {
             api_.SendMessage(id_, fmt::format("На данный момент действует ограничение – "
                 "у вас может быть не больше {}. Воспользуйтесь удалением, затем повторите попытку.", 
-                GetSlavicBooks(Case::kGenitive, kLimitBooks)));
+                GetSlavicBooks(Case::kGenitive, Book::kLimitBooks)));
             is_finish_ = true;
         } else {
             api_.SendMessage(id_, "Введите автора книги.");
@@ -35,7 +35,6 @@ public:
 
 private:
     std::string author_;
-    static constexpr auto kLimitBooks = 5;
 
     int64_t id_;
     IApiTelegram& api_;

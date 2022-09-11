@@ -18,11 +18,9 @@ add_library(Conversation src/reader-bot/conversation.cpp)
 target_include_directories(Conversation PUBLIC include/reader-bot)
 
 add_library(Api src/api.cpp)
-add_library(Clock src/clock.cpp)
 
 target_link_libraries(Api PRIVATE PocoNetSSL PocoNet PocoFoundation PocoJSON fmt)
 target_link_libraries(Conversation PUBLIC fmt)
-target_link_libraries(Clock PUBLIC fmt)
 
-target_link_libraries(PushUpBot PRIVATE Api Clock pthread)
+target_link_libraries(PushUpBot PRIVATE Api pthread fmt)
 target_link_libraries(ReaderBot PRIVATE Api Conversation pthread)

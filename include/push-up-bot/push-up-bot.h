@@ -8,44 +8,45 @@
 #include <mutex>
 
 #include "api.h"
-#include "clock.h"
 
-struct InfoContext {
-    uint64_t last_activity;
-    uint16_t days;
-    std::string start_date;
+struct ShockSeries {
+    bool is_update = false;
+    uint16_t days = 0;
+    uint64_t start;
+};
+
+struct User {
+    std::string username;
+    std::optional<ShockSeries> series;
 };
 
 struct FileConfig {
     uint64_t offset = 0;
-    std::unordered_map<int64_t, InfoContext> stats;
+    std::unordered_map<int64_t, User> users;
 };
 
 class PushUpBot {
 public:
     explicit PushUpBot();
-    ~PushUpBot();
     void Run();
 private:
     void SaveConfig();
     void HandleVideo(const RequestBot& request);
-    std::optional<std::string> GetReminderMessage();
-    void ResetStats();
-    void ShowStats();
-    void RemainderThreadLogic();
-    void ResetThreadLogic();
+    void SendReminderMessage();
 
-    const std::string endpoint_ = "https://api.telegram.org/bot5524400810:AAGhIs3__dsjSoFHzIHZ932Yorf2xBcK7Aw/";
-    const int64_t channel_id_ = -1001610052114;
+    void SendDays();
+    void RemainderThreadLogic();
+    void StatsThreadLogic();
+
+    const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
+    const int64_t channel_id_ = -1001481144373;
+    const std::string config_name_ = "config.json";
 
     std::unique_ptr<IApiTelegram> api_;
-    CurrentTime time_;
     
-    std::unordered_map<int64_t, std::string> admins_;
     FileConfig config_;
-    const std::string config_name_ = "../config/config.json";
 
     std::thread remainder_thread_;
-    std::thread reset_thread_;
+    std::thread stats_thread_;
     std::mutex mutex_;
  };

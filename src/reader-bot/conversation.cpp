@@ -181,7 +181,7 @@ private:
         pages_ =  static_cast<uint32_t>(pages.second - pages.first + 1);
         state_ = kWaitRetell;
         api_->SendMessage(id_, fmt::format("Принято. Переходим к пересказу.\n\n"
-        "Единственное ограничение на пересказ – не менее *{}* (в среднем, это 2-4 предложения).\n\n"
+        "Единственное ограничение на пересказ – не менее *{}* (в среднем, это 2-3 предложения).\n\n"
         "Введите текст.", GetSlavicSymbols(Case::kGenitive, kLimitSymbols)), ParseMode::kMarkdown);
     } catch (const std::logic_error&) {
             api_->SendMessage(id_, "Некорректный ввод страниц.");
@@ -235,7 +235,7 @@ private:
     Book book_;
     uint16_t pages_;
     std::string retell_;
-    static constexpr auto kLimitSymbols = 250u;
+    static constexpr auto kLimitSymbols = 150u;
 
     enum State {kWaitBook, kWaitPages, kWaitRetell};
     State state_;

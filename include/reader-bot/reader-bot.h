@@ -4,7 +4,6 @@
 #include <thread>
 
 #include "api.h"
-#include "clock.h"
 #include "storage.h"
 #include "conversation.h"
 
@@ -49,13 +48,12 @@ private:
     void SendRounds();
     void SendAllPages();
 
-    const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
-    const int64_t channel_id_ = -1001481144373;
-    const std::string channel_link_ = "https://t.me/+63V1t5gCMTViNjZi";
+    const std::string endpoint_ = "https://api.telegram.org/bot5659631757:AAEeYIlp3ePkFnxKYXH1yd0bB9AXzgwtOkE/";
+    const int64_t channel_id_ = -1001786572579;
+    const std::string channel_link_ = "https://t.me/+-vBRibxkUCRmMTUy";
     std::unique_ptr<IApiTelegram> api_;
 
     FileConfig config_;
-    CurrentTime time_; 
 
     std::mutex mutex_;
     std::thread update_thread_;

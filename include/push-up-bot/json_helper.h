@@ -16,7 +16,8 @@ inline void from_json(const nlohmann::json& j, ShockSeries& series) {
 }
 
 inline void to_json(nlohmann::json& j, User user) {
-    j = {{"username", std::move(user.username)}};
+    j = {{"username", std::move(user.username)}, 
+         {"durations", user.durations}};
     if (user.series) {
         j["series"] = std::move(*user.series);
     }
@@ -24,6 +25,7 @@ inline void to_json(nlohmann::json& j, User user) {
 
 inline void from_json(const nlohmann::json& j, User& user) {
     user.username = j.at("username");
+    user.durations = j.at("durations");
     if (j.contains("series")) {
         user.series = j.at("series");
     }

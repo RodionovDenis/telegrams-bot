@@ -20,8 +20,7 @@ static constexpr const char* info = "*Прежде, чем общаться со
     "Теперь ты знаком с моими основными командами. Самое время прочитать наши правила – когда и по сколько читать. "
     "Правила доступны тебе по команде /rules.\n\n"
     "Важные ссылки:\n\n"
-    "{} с публикациями.\n\n"
-    "{} доступен по всем вопросам (предложениям, улучшениям и неполадкам).";
+    "{} с публикациями. Здесь ты сможешь следить за другими участниками, получать статистику, задавать свои вопросы.";
 
 static constexpr const char* rules = "*Наши правила: *\n\n"
     "Читаем каждую неделю *двумя раундами*.\n\n"
@@ -168,8 +167,8 @@ void ReaderBot::ThreadReminder() {
     static constexpr auto kUntil = []() {
         const auto& [time, days, weekday] = GetTimeDaysWeek();
         if ((weekday == std::chrono::Sunday && time.hours().count() >= kReminderHour) || 
-            (weekday == std::chrono::Wednesday && time.hours().count() < kReminderHour) ||
-            (weekday == std::chrono::Monday) || (weekday == std::chrono::Tuesday)) {
+            (weekday == std::chrono::Monday) || (weekday == std::chrono::Tuesday) ||
+            (weekday == std::chrono::Wednesday && time.hours().count() < kReminderHour)) {
             return days + (std::chrono::Wednesday - weekday) + std::chrono::hours{kReminderHour};
         }
         return days + (std::chrono::Sunday - weekday) + std::chrono::hours{kReminderHour};
@@ -287,7 +286,7 @@ void ReaderBot::SendStart(int64_t id) const {
 
 void ReaderBot::SendInfo(int64_t id) const {
     api_->SendMessage(id, fmt::format(info, GetSlavicBooks(Case::kGenitive, Book::kLimitBooks),
-        GetLink("Общий канал", channel_link_), GetReference(957596074, "Денис")), ParseMode::kMarkdown);
+        GetLink("Общий канал", channel_link_)), ParseMode::kMarkdown);
 }
 
 void ReaderBot::SendRules(int64_t id) const {

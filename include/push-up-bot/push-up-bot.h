@@ -17,6 +17,7 @@ struct ShockSeries {
 
 struct User {
     std::string username;
+    uint32_t durations;
     std::optional<ShockSeries> series;
 };
 

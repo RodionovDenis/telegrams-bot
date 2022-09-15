@@ -25,9 +25,6 @@ struct ShockSeries {
     static constexpr auto kLimitPages = 15u;
     uint32_t rounds = 0;
     uint16_t pages = 0;
-    bool operator<(const ShockSeries& rhs) const {
-        return std::tie(rounds, pages) < std::tie(rhs.rounds, rhs.pages);
-    }
 };
 
 struct User {

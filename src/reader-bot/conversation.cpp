@@ -178,7 +178,8 @@ private:
 
     void HandlePages(const std::string& message) try {
         auto pages = GetNumbers(message);
-        pages_ =  static_cast<uint32_t>(pages.second - pages.first + 1);
+        start_page_ = pages.first;
+        finish_page_ = pages.second;
         state_ = kWaitRetell;
         api_->SendMessage(id_, fmt::format("Принято. Переходим к пересказу.\n\n"
         "Единственное ограничение на пересказ – не менее *{}* (в среднем, это 2-3 предложения).\n\n"
@@ -204,8 +205,10 @@ private:
     void SendRetellMessage() {
         auto url = GetReference(id_);
         auto text_link = AddTextLink(0, GetLengthUtf16(user_->username), url);
-        auto message = fmt::format("{} прочитал(а) {}.\n\nАвтор книги: {}\nНазвание книги: {}\n\nКраткий пересказ: ", 
-                                    user_->username, GetSlavicPages(Case::kAccusative, pages_), book_.author, book_.name);
+        auto message = fmt::format("{} прочитал(а) {} (с {} по {}).\n\n"
+            "Автор книги: {}\nНазвание книги: {}\n\nКраткий пересказ: ", 
+            user_->username, GetSlavicPages(Case::kAccusative, finish_page_ - start_page_ + 1),
+            start_page_, finish_page_, book_.author, book_.name);
         auto spoiler = AddSpoiler(GetLengthUtf16(message), GetLengthUtf16(retell_));
         message += retell_;
         api_->SendMessage(channel_id_, message, ParseMode::kNone, nlohmann::json{}, {text_link, spoiler});
@@ -220,20 +223,22 @@ private:
         }
         retell_ = std::move(message);
         auto& series = user_->series;
+        uint16_t pages = finish_page_ - start_page_ + 1;
         if (series) { 
-            series->pages += pages_;
+            series->pages += pages;
         } else {
-            series = ShockSeries{.rounds = 0, .pages = pages_};
+            series = ShockSeries{.rounds = 0, .pages = pages};
         }
-        user_->all_pages += pages_;
-        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ваш сеанс добавлен. {}", GetSlavicPages(Case::kAccusative, pages_), 
+        user_->all_pages += pages;
+        api_->SendMessage(id_, fmt::format("Вы прочитали {}. Ваш сеанс добавлен. {}", GetSlavicPages(Case::kAccusative, pages), 
             GetAddSessionFinish()));
         SendRetellMessage();
         is_finish_ = true;
     }
 
     Book book_;
-    uint16_t pages_;
+    uint16_t start_page_;
+    uint16_t finish_page_;
     std::string retell_;
     static constexpr auto kLimitSymbols = 150u;
 

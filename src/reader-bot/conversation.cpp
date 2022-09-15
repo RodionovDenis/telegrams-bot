@@ -139,8 +139,8 @@ public:
     AddSession(int64_t id, int64_t channel_id, IApiTelegram* api, User* user, std::chrono::weekday day) 
     : id_(id), channel_id_(channel_id), api_(api), user_(user) {
         if (day == std::chrono::Thursday) {
-            api_->SendMessage(id_, "Сегодня четверг – выходной день." 
-                "Пользоваться командой /add_session запрещено.");
+            api_->SendMessage(id_, "Сегодня четверг – выходной день. " 
+                "Командой /add_session недоступна. Повторите попытку завтра.");
             is_finish_ = true;
         }
         else if (user_->books.empty()) {

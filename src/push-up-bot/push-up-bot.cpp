@@ -166,7 +166,7 @@ void PushUpBot::SendGlobalDuration() {
 void PushUpBot::StatsThreadLogic() {
     static constexpr auto kUntil = []() {
         auto days = GetTimeDays().second;
-        return days + std::chrono::minutes{15};
+        return days + std::chrono::days{1};
     };
     while (true) {
         std::this_thread::sleep_until(kUntil() - std::chrono::seconds{2});

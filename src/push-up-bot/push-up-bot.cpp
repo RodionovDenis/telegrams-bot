@@ -66,7 +66,7 @@ void PushUpBot::SendReminderMessage() {
         message += fmt::format("{} — на кону *{}*.\n", GetReference(id, username), 
             GetSlavicDays(Case::kNominative, days));
     }
-    message += "\n\n*Успейте продлить свой ударный режим!*";
+    message += "\n*Успейте продлить свой ударный режим!*";
     api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
 }
 

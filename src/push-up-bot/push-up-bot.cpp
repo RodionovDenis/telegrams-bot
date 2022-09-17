@@ -15,6 +15,17 @@ auto GetTimeDays() {
     return std::make_pair(time, days - std::chrono::hours{3});
 }
 
+std::string GetData(uint64_t unix_time) {
+    static constexpr std::array months = {"января", "февраля", "марта", "апреля", "мая",
+        "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"};
+    auto now = std::chrono::system_clock::from_time_t(unix_time) + std::chrono::hours{3};
+    const std::chrono::year_month_day ymd{std::chrono::floor<std::chrono::days>(now)};
+    auto year = static_cast<int>(ymd.year());
+    auto month = static_cast<unsigned int>(ymd.month());
+    auto day = static_cast<unsigned>(ymd.day());
+    return fmt::format("с {} {} {}", day, months[month - 1], year);
+}
+
 std::string DurationToTime(uint16_t d) {
     static constexpr std::array funcs = {&GetSlavicDays, &GetSlavicHours, 
         &GetSlavicMinutes, &GetSlavicSeconds};
@@ -52,19 +63,22 @@ void PushUpBot::SendReminderMessage() {
     std::string message = fmt::format("До сгорания ударных режимов {} {}.\n\n",
         left, GetSlavicHours(Case::kNominative, 24 - hour));
     for (const auto& [id, username, days]: v) {
-        message += fmt::format("{} — {}.\n", GetReference(id, username), 
+        message += fmt::format("{} — на кону *{}*.\n", GetReference(id, username), 
             GetSlavicDays(Case::kNominative, days));
     }
-    message += "\n*Успейте отжаться!*";
+    message += "\n\n*Успейте продлить свой ударный режим!*";
     api_->SendMessage(channel_id_, message, ParseMode::kMarkdown);
 }
 
 void PushUpBot::RemainderThreadLogic() {
     static constexpr auto kUntil = []() {
-        return std::chrono::seconds{23};
+        const auto& [time, days] = GetTimeDays();
+        auto h = time.hours().count();
+        h = std::max(h + 1, 19l) + (h == 23) * 19;
+        return days + std::chrono::hours{h};
     };
     while (true) {
-        std::this_thread::sleep_for(kUntil());
+        std::this_thread::sleep_until(kUntil());
         std::lock_guard guard(mutex_);
         SendReminderMessage();
     }
@@ -118,8 +132,9 @@ void PushUpBot::SendDays() {
     auto lost = std::make_pair(std::string("Участники, *потерявшие* свой ударный режим. \n\n"), 0);
     for (const auto& [id, username, is_series, days]: v) {
         if (is_series) {
-            save.first += fmt::format("{}. {} – теперь твой ударный режим {}.\n", ++save.second,
-                GetReference(id, username), GetSlavicDays(Case::kNominative, days));
+            save.first += fmt::format("{}. {} – теперь твой ударный режим {} ({}).\n", ++save.second,
+                GetReference(id, username), GetSlavicDays(Case::kNominative, days), 
+                GetData(config_.users.at(id).series->start));
         } else {
             lost.first += fmt::format("{}. {} – твой ударный режим ({}) сгорел.\n", ++lost.second,
                 GetReference(id, username), GetSlavicDays(Case::kNominative, days));
@@ -151,11 +166,10 @@ void PushUpBot::SendGlobalDuration() {
 void PushUpBot::StatsThreadLogic() {
     static constexpr auto kUntil = []() {
         auto days = GetTimeDays().second;
-        //return days + std::chrono::days{24};
-        return std::chrono::minutes{1};
+        return days + std::chrono::days{24};
     };
     while (true) {
-        std::this_thread::sleep_for(kUntil() - std::chrono::seconds{2});
+        std::this_thread::sleep_until(kUntil() - std::chrono::seconds{2});
         std::lock_guard guard(mutex_);
         SendLocalDuration();
         SendDays();

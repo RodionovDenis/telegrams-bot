@@ -4,20 +4,20 @@
 #include "push-up-bot.h"
 
 inline void to_json(nlohmann::json& j, ShockSeries series) {
-    j = {{"is_update", series.is_update},
+    j = {{"duration", series.duration},
          {"days", series.days},
          {"start", series.start}};
 }
 
 inline void from_json(const nlohmann::json& j, ShockSeries& series) {
-    series.is_update = j.at("is_update");
+    series.duration = j.at("duration");
     series.days = j.at("days");
     series.start = j.at("start");
 }
 
 inline void to_json(nlohmann::json& j, User user) {
     j = {{"username", std::move(user.username)}, 
-         {"durations", user.durations}};
+         {"sum_durations", user.sum_durations}};
     if (user.series) {
         j["series"] = std::move(*user.series);
     }
@@ -25,7 +25,7 @@ inline void to_json(nlohmann::json& j, User user) {
 
 inline void from_json(const nlohmann::json& j, User& user) {
     user.username = j.at("username");
-    user.durations = j.at("durations");
+    user.sum_durations = j.at("sum_durations");
     if (j.contains("series")) {
         user.series = j.at("series");
     }

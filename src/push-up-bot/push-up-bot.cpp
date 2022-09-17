@@ -36,7 +36,7 @@ std::string DurationToTime(uint16_t d) {
 
 void PushUpBot::SendReminderMessage() {
     static constexpr auto kFilter = [](const auto& pair) {
-        return pair.second.series && !pair.second.series->is_update;
+        return pair.second.series && !pair.second.series->duration;
     };
     static constexpr auto kTransform = [](const auto& pair) {
         return std::make_tuple(pair.first, pair.second.username, pair.second.series->days);
@@ -48,8 +48,9 @@ void PushUpBot::SendReminderMessage() {
     }
     std::ranges::sort(v, std::greater{}, [](const auto& tuple) { return std::get<2>(tuple); });
     auto hour = GetTimeDays().first.hours().count();
-    std::string message = fmt::format("До сгорания ударных режимов ровно {}.\n\n",
-        GetSlavicHours(Case::kNominative, 24 - hour));
+    std::string left = ((24 - hour) == 1) ? "остался" : "осталось";
+    std::string message = fmt::format("До сгорания ударных режимов {} {}.\n\n",
+        left, GetSlavicHours(Case::kNominative, 24 - hour));
     for (const auto& [id, username, days]: v) {
         message += fmt::format("{} — {}.\n", GetReference(id, username), 
             GetSlavicDays(Case::kNominative, days));
@@ -69,6 +70,27 @@ void PushUpBot::RemainderThreadLogic() {
     }
 }
 
+void PushUpBot::SendLocalDuration() {
+    static constexpr auto kFilter = [](const auto& pair) {
+        return pair.second.series.has_value() && pair.second.series->duration;
+    };
+    static constexpr auto kTransform = [](const auto& pair) {
+        return std::make_tuple(pair.first, pair.second.username, pair.second.series->duration);
+    };
+    auto views = config_.users | std::views::filter(kFilter) | std::views::transform(kTransform);
+    std::vector v(views.begin(), views.end());
+    if (v.empty()) {
+        api_->SendMessage(channel_id_, "Сегодня никто не отжимался...");
+        return;
+    }
+    std::ranges::sort(v, std::greater{}, [](const auto& tuple) { return std::get<2>(tuple); });
+    auto top = std::make_pair(std::string("Рейтинг участников по продолжительности отжиманий *сегодня*.\n\n"), 0);
+    for (const auto& [id, username, d]: v) {
+        top.first += fmt::format("{}. {} – {}.\n", ++top.second, GetReference(id, username), DurationToTime(d));
+    }
+    api_->SendMessage(channel_id_, top.first, ParseMode::kMarkdown);
+}
+
 void PushUpBot::SendDays() {
     static constexpr auto kFilter = [](const auto& pair) {
         return pair.second.series.has_value();
@@ -76,8 +98,9 @@ void PushUpBot::SendDays() {
     static constexpr auto kTransform = [](auto& pair) {
         auto& series = pair.second.series;
         uint16_t days;
-        if (series->is_update) {
-            series->is_update = false;
+        if (series->duration) {
+            pair.second.sum_durations += series->duration;
+            series->duration = 0;
             days = ++series->days;
         } else {
             days = series->days;
@@ -107,10 +130,23 @@ void PushUpBot::SendDays() {
     }
     if (lost.second) {
         api_->SendMessage(channel_id_, lost.first, ParseMode::kMarkdown);
-    } else {
-        api_->SendMessage(channel_id_, "*Сегодня никто не потерял свой ударный режим!*", ParseMode::kMarkdown);
     }
 }
+
+void PushUpBot::SendGlobalDuration() {
+    static constexpr auto kTransform = [](const auto& pair) {
+        return std::make_tuple(pair.first, pair.second.username, pair.second.sum_durations);
+    };
+    auto views = config_.users | std::views::transform(kTransform);
+    std::vector v(views.begin(), views.end());
+    std::ranges::sort(v, std::greater{}, [](const auto& tuple) { return std::get<2>(tuple); });
+    auto top = std::make_pair(std::string("Рейтинг участников по продолжительности отжиманий *за всё время*.\n\n"), 0);
+    for (const auto& [id, username, d]: v) {
+        top.first += fmt::format("{}. {} – {}.\n", ++top.second, GetReference(id, username), DurationToTime(d));
+    }
+    api_->SendMessage(channel_id_, top.first, ParseMode::kMarkdown);
+}
+
 
 void PushUpBot::StatsThreadLogic() {
     static constexpr auto kUntil = []() {
@@ -121,7 +157,9 @@ void PushUpBot::StatsThreadLogic() {
     while (true) {
         std::this_thread::sleep_for(kUntil() - std::chrono::seconds{2});
         std::lock_guard guard(mutex_);
+        SendLocalDuration();
         SendDays();
+        SendGlobalDuration();
         std::this_thread::sleep_for(std::chrono::seconds{2});
         api_->SendMessage(channel_id_, "*Старт нового дня!*", ParseMode::kMarkdown);
         SaveConfig();
@@ -149,14 +187,12 @@ void PushUpBot::HandleVideo(const Request& request) {
     auto it = config_.users.find(request.id);
     if (it != config_.users.end()) {
         it->second.username = std::move(request.username);
-        it->second.durations += *request.duration;
         auto series = it->second.series.value_or(ShockSeries{.start = request.time});
-        series.is_update = true;
+        series.duration += *request.duration;
         it->second.series = std::move(series);
     } else {
-        auto series = ShockSeries{.is_update = true, .start = request.time};
-        auto user = User{.username = std::move(request.username), .durations = *request.duration, 
-            .series = std::move(series)};
+        auto series = ShockSeries{.duration = *request.duration, .start = request.time};
+        auto user = User{.username = std::move(request.username), .series = std::move(series)};
         config_.users.emplace(request.id, std::move(user));
     }
     SaveConfig();

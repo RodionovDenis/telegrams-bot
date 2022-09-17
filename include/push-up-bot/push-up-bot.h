@@ -10,14 +10,14 @@
 #include "api.h"
 
 struct ShockSeries {
-    bool is_update = false;
+    uint16_t duration = 0;
     uint16_t days = 0;
     uint64_t start;
 };
 
 struct User {
     std::string username;
-    uint32_t durations;
+    uint32_t sum_durations;
     std::optional<ShockSeries> series;
 };
 
@@ -35,13 +35,15 @@ private:
     void HandleVideo(const Request& request);
     void SendReminderMessage();
 
+    void SendLocalDuration();
     void SendDays();
+    void SendGlobalDuration();
     void RemainderThreadLogic();
     void StatsThreadLogic();
 
-    const std::string endpoint_ = "https://api.telegram.org/bot5437368583:AAE0XIWHHx3EaDRPTYGyJL0W3R0MeuQiuSc/";
-    const int64_t channel_id_ = -1001481144373;
-    const std::string config_name_ = "config.json";
+    const std::string endpoint_ = "https://api.telegram.org/bot5524400810:AAGhIs3__dsjSoFHzIHZ932Yorf2xBcK7Aw/";
+    const int64_t channel_id_ = -1001610052114;
+    const std::string config_name_ = "push_up.json";
 
     std::unique_ptr<IApiTelegram> api_;
     

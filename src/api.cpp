@@ -104,8 +104,8 @@ std::pair<uint64_t, std::vector<Request>> ApiTelegram::GetUpdates(uint64_t offse
         const auto& message = it.extract<Poco::JSON::Object::Ptr>()->getObject("message");
         const auto& post = it.extract<Poco::JSON::Object::Ptr>()->getObject("channel_post");
         if (!post.isNull() && (post->has("video_note") || post->has("video")) && CheckChannel(post)) {
-            auto id = post->getValue<int64_t>("id");
             const auto& username = post->getValue<std::string>("author_signature");
+            auto id = GetAdminID(username);
             auto time = post->getValue<uint64_t>("date");
             std::string key = post->has("video_note") ? "video_note" : "video";
             auto duration = post->getObject(key)->getValue<uint16_t>("duration");

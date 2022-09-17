@@ -68,7 +68,7 @@ void ReaderBot::Run() {
         std::lock_guard guard(mutex_);
         config_.offset = responses.first;
         for (const auto& request: responses.second) {
-            if (request.sender_type != SenderType::kPerson) {
+            if (request.request_type != RequestType::kPrivate) {
                 continue;
             }
             HandleRequest(request);
@@ -264,7 +264,7 @@ void ReaderBot::HandleExistConversation(int64_t id, const std::string& message, 
     }
 }
 
-void ReaderBot::HandleRequest(const RequestBot& request) {
+void ReaderBot::HandleRequest(const Request& request) {
     config_.users.try_emplace(request.id, User{.username = request.username});
     auto id = request.id;
     config_.users.at(id).username = std::move(request.username);

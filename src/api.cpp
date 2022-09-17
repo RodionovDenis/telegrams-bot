@@ -8,6 +8,11 @@
 #include "api.h"
 #include "fmt/format.h"
 
+Request::Request(RequestType rt, int64_t i, const std::string& u, uint64_t tm, 
+        const std::optional<std::string>& t, std::optional<uint16_t> d)
+: request_type(rt), id(i), username(u), time(tm), text(t), duration(d) {
+}
+
 class ApiTelegram : public IApiTelegram {
 public:
     ApiTelegram(const std::string& endpoint, int64_t channel_id);
@@ -15,12 +20,13 @@ public:
                      ParseMode parse_mode,
                      const nlohmann::json& reply_markup, 
                      const std::vector<nlohmann::json>& entities) override;
-    std::pair<uint64_t, std::vector<RequestBot>> GetUpdates(uint64_t offset, uint16_t timeout) override;
+    std::pair<uint64_t, std::vector<Request>> GetUpdates(uint64_t offset, uint16_t timeout) override;
     int64_t GetAdminID(const std::string& name) override;
     std::unordered_map<int64_t, std::string> GetChatAdmins() override;
 
 private:
     Poco::Dynamic::Var GetReply(const Poco::URI& uri);
+    bool CheckChannel(Poco::JSON::Object::Ptr post) const;
     const std::string endpoint_;
     int64_t channel_id_;
 };
@@ -83,23 +89,27 @@ int64_t ApiTelegram::GetAdminID(const std::string& name) {
     throw std::runtime_error("Nickname " + name + " is not found!");
 }
 
-std::pair<uint64_t, std::vector<RequestBot>> ApiTelegram::GetUpdates(uint64_t offset, uint16_t timeout) {
+bool ApiTelegram::CheckChannel(Poco::JSON::Object::Ptr post) const {
+    return post->getObject("chat")->getValue<int64_t>("id") == channel_id_;
+}
+
+std::pair<uint64_t, std::vector<Request>> ApiTelegram::GetUpdates(uint64_t offset, uint16_t timeout) {
     Poco::URI uri{endpoint_ + "getUpdates"};
     uri.addQueryParameter("offset", std::to_string(offset));
     uri.addQueryParameter("timeout", std::to_string(timeout));
     const auto reply = GetReply(uri);
     const auto& result = reply.extract<Poco::JSON::Object::Ptr>()->getArray("result");
-    std::vector<RequestBot> requests;
+    std::vector<Request> requests;
     for (const auto& it : *result) {
         const auto& message = it.extract<Poco::JSON::Object::Ptr>()->getObject("message");
         const auto& post = it.extract<Poco::JSON::Object::Ptr>()->getObject("channel_post");
-        if ((message.isNull() && post.isNull()) || 
-            (!post.isNull() && post->getObject("chat")->getValue<int64_t>("id") != channel_id_) ) {
-                continue;
-        } else if (!post.isNull() && (post->has("video_note") || post->has("video"))) {
+        if (!post.isNull() && (post->has("video_note") || post->has("video")) && CheckChannel(post)) {
+            auto id = post->getValue<int64_t>("id");
             const auto& username = post->getValue<std::string>("author_signature");
             auto time = post->getValue<uint64_t>("date");
-            requests.emplace_back(GetAdminID(username), username, time, SenderType::kChannel);   
+            std::string key = post->has("video_note") ? "video_note" : "video";
+            auto duration = post->getObject(key)->getValue<uint16_t>("duration");
+            requests.emplace_back(RequestType::kChannel, id, username, time, std::nullopt, duration);
         } else if (!message.isNull() && message->has("text")) {
             const auto& chat = message->getObject("chat");
             auto id = chat->getValue<int64_t>("id");
@@ -108,7 +118,8 @@ std::pair<uint64_t, std::vector<RequestBot>> ApiTelegram::GetUpdates(uint64_t of
                 username += " " + chat->getValue<std::string>("last_name");   
             }
             auto time = message->getValue<uint64_t>("date");
-            requests.emplace_back(id, username, time, SenderType::kPerson, message->getValue<std::string>("text"));
+            auto text = message->getValue<std::string>("text");
+            requests.emplace_back(RequestType::kPrivate, id, username, time, text, std::nullopt);
         }
         offset = it.extract<Poco::JSON::Object::Ptr>()->getValue<uint64_t>("update_id") + 1;
     }

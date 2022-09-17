@@ -15,6 +15,25 @@ auto GetTimeDays() {
     return std::make_pair(time, days - std::chrono::hours{3});
 }
 
+std::string DurationToTime(uint16_t d) {
+    static constexpr std::array funcs = {&GetSlavicDays, &GetSlavicHours, 
+        &GetSlavicMinutes, &GetSlavicSeconds};
+    std::array durations = {d / 86400, d / 3600 % 24, d % 3600 / 60, d % 60};
+    std::string v;
+    const auto f = [&v](int n, auto& slavic_form) {
+        if (n == 0) {
+            return;
+        } else if (!v.empty()) {
+            v.append(", ");
+        }
+        v.append(fmt::format("{}", (*slavic_form)(Case::kNominative, n)));
+    };
+    for (auto i : std::views::iota(0ull, funcs.size())) {
+        f(durations[i], funcs[i]);
+    }
+    return v;
+}
+
 void PushUpBot::SendReminderMessage() {
     static constexpr auto kFilter = [](const auto& pair) {
         return pair.second.series && !pair.second.series->is_update;
@@ -126,28 +145,30 @@ void PushUpBot::SaveConfig() {
     std::ofstream{config_name_} << j;
 }
 
-void PushUpBot::HandleVideo(const RequestBot& request) {
+void PushUpBot::HandleVideo(const Request& request) {
     auto it = config_.users.find(request.id);
     if (it != config_.users.end()) {
         it->second.username = std::move(request.username);
+        it->second.durations += *request.duration;
         auto series = it->second.series.value_or(ShockSeries{.start = request.time});
         series.is_update = true;
         it->second.series = std::move(series);
     } else {
         auto series = ShockSeries{.is_update = true, .start = request.time};
-        auto user = User{.username = std::move(request.username), .series = std::move(series)};
-        config_.users.insert({request.id, std::move(user)});
+        auto user = User{.username = std::move(request.username), .durations = *request.duration, 
+            .series = std::move(series)};
+        config_.users.emplace(request.id, std::move(user));
     }
     SaveConfig();
 }
 
 void PushUpBot::Run() {
     while (true) {
-        auto responses = api_->GetUpdates(config_.offset, 3600u);
+        auto [offset, requests] = api_->GetUpdates(config_.offset, 3600u);
         std::lock_guard guard(mutex_);
-        config_.offset = responses.first;
-        for (const auto& request: responses.second) {
-            if (request.sender_type != SenderType::kChannel) {
+        config_.offset = offset;
+        for (const auto& request: requests) {
+            if (request.request_type != RequestType::kChannel) {
                 continue;
             }
             HandleVideo(request);

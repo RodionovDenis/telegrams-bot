@@ -32,7 +32,7 @@ public:
     void Run();
 private:
     void SaveConfig();
-    void HandleVideo(const RequestBot& request);
+    void HandleVideo(const Request& request);
     void SendReminderMessage();
 
     void SendDays();

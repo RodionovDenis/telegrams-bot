@@ -8,18 +8,18 @@
 
 #include "nlohmann/json.hpp"
 
-enum class SenderType {kChannel, kPerson};
+enum class RequestType {kPrivate, kChannel};
 
-struct RequestBot {
+struct Request {
+    RequestType request_type;
     int64_t id;
     std::string username;
     uint64_t time;
-    SenderType sender_type;
     std::optional<std::string> text;
-    RequestBot(int64_t i, const std::string& us, uint64_t ti, 
-               const SenderType& se, const std::optional<std::string>& te = std::nullopt)
-    : id(i), username(us), time(ti), sender_type(se), text(te) {
-    }
+    std::optional<uint16_t> duration;
+
+    Request(RequestType rt, int64_t i, const std::string& u, uint64_t tm, 
+        const std::optional<std::string>& t, std::optional<uint16_t> d);
 };
 
 enum class ParseMode {kMarkdown, kNone};
@@ -30,7 +30,7 @@ public:
                              ParseMode parse_mode = ParseMode::kNone,
                              const nlohmann::json& reply_markup = {}, 
                              const std::vector<nlohmann::json>& entities = {}) = 0;
-    virtual std::pair<uint64_t, std::vector<RequestBot>> GetUpdates(uint64_t offset, uint16_t timeout) = 0;
+    virtual std::pair<uint64_t, std::vector<Request>> GetUpdates(uint64_t offset, uint16_t timeout) = 0;
     virtual std::unordered_map<int64_t, std::string> GetChatAdmins() = 0;
     virtual int64_t GetAdminID(const std::string& name) = 0;
     virtual ~IApiTelegram() = default;

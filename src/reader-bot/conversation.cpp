@@ -140,7 +140,7 @@ public:
     : id_(id), channel_id_(channel_id), api_(api), user_(user) {
         if (day == std::chrono::Thursday) {
             api_->SendMessage(id_, "Сегодня четверг – выходной день. " 
-                "Командой /add_session недоступна. Повторите попытку завтра.");
+                "Команда /add_session недоступна. Повторите попытку завтра.");
             is_finish_ = true;
         }
         else if (user_->books.empty()) {

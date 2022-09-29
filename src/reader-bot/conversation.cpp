@@ -192,7 +192,7 @@ private:
         auto pages = user_->series->pages; 
         if (pages < ShockSeries::kLimitPages) {
             return fmt::format("\n\nЧтобы остаться в ударном режиме, вам необходимо прочитать еще {} "
-                "в текущем раунде.", GetSlavicPages(Case::kGenitive, ShockSeries::kLimitPages - pages));
+                "в текущем раунде.", GetSlavicPages(Case::kAccusative, ShockSeries::kLimitPages - pages));
         } else if (pages > ShockSeries::kLimitPages) {
             return fmt::format("\n\nВ текущем раунде вы прочитали на {} больше минимума.\n\n"
                 "Вы остаетесь в ударном режиме.", 

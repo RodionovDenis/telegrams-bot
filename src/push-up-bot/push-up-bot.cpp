@@ -214,14 +214,19 @@ void PushUpBot::HandleVideo(const Request& request) {
 
 void PushUpBot::Run() {
     while (true) {
-        auto [offset, requests] = api_->GetUpdates(config_.offset, 3600u);
-        std::lock_guard guard(mutex_);
-        config_.offset = offset;
-        for (const auto& request: requests) {
-            if (request.request_type != RequestType::kChannel) {
-                continue;
+        try {
+            auto [offset, requests] = api_->GetUpdates(config_.offset, 3600u);
+            std::lock_guard guard(mutex_);
+            config_.offset = offset;
+            for (const auto& request: requests) {
+                if (request.request_type != RequestType::kChannel) {
+                    continue;
+                }
+                HandleVideo(request);
             }
-            HandleVideo(request);
+        } catch (const std::exception& ex) {
+            api_->SendMessage(957596074, fmt::format("Я упал... Текст исключения: *{}*", ex.what()), 
+                ParseMode::kMarkdown);
         }
     }
 }
